@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using MySqlConnector;
 using Tracker.Data;
+using Tracker.Search;
 
 var builder = WebApplication.CreateBuilder(args);
 // Get the MySQL connection string
@@ -28,7 +29,20 @@ builder.Services.AddAuthorization();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
+// Smart name search (local LLM via Ollama + fuzzy matching)
+builder.Services.Configure<OllamaOptions>(
+    builder.Configuration.GetSection("Ollama"));
+builder.Services.AddHttpClient<QueryInterpreter>();
+builder.Services.AddScoped<SearchService>();
+
 var app = builder.Build();
+
+app.Lifetime.ApplicationStarted.Register(() =>
+{
+    var scope = app.Services.CreateScope();
+    var interpreter = scope.ServiceProvider.GetRequiredService<QueryInterpreter>();
+    _ = interpreter.WarmUpAsync().ContinueWith(_ => scope.Dispose());
+});
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseDefaultFiles();
@@ -70,26 +84,25 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-var summaries = new[]
+app.MapGet("/api/search", async (
+    string? q,
+    SearchService search,
+    CancellationToken ct) =>
 {
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
+    if (string.IsNullOrWhiteSpace(q) || NameNormalizer.Normalize(q).Length == 0)
+    {
+        return Results.BadRequest("Please enter a name.");
+    }
 
-app.MapGet("/weatherforecast", () =>
-{
-    var forecast = Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast");
-
-
+    try
+    {
+        return Results.Ok(await search.SearchAsync(q, ct));
+    }
+    catch (MySqlException ex)
+    {
+        return Results.Problem($"Database error: {ex.Message}");
+    }
+});
 
 
 app.MapGet("/api/results", async (
@@ -282,8 +295,3 @@ app.MapDelete("/api/saved-results/{savedId}", async (
 }).RequireAuthorization();
 
 app.Run();
-
-internal record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}

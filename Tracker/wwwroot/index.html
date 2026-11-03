@@ -1,0 +1,116 @@
+﻿<!DOCTYPE html>
+<html lang="bg">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Постижения</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header class="topbar">
+        <a class="brand" href="/">
+            <span class="brand-mark" aria-hidden="true">★</span>
+            <span>Постижения</span>
+        </a>
+
+        <div class="account">
+            <span id="accountStatus" class="account-status"></span>
+            <button id="libraryButton" class="button ghost" hidden>Моята библиотека</button>
+            <button id="accountButton" class="button ghost">Вход</button>
+            <button id="logoutButton" class="button ghost" hidden>Изход</button>
+        </div>
+    </header>
+
+    <main>
+        <section class="hero">
+            <h1>Открий своите постижения</h1>
+            <p class="lead">
+                Напиши името си така, както ти е удобно: с грешка, на латиница,
+                с умалително или в изречение. Изкуственият интелект ще разбере.
+            </p>
+
+            <form id="searchForm" class="search" role="search">
+                <label for="searchInput" class="visually-hidden">Име на ученик</label>
+                <input id="searchInput"
+                       type="search"
+                       autocomplete="off"
+                       placeholder="Напиши името си…"
+                       maxlength="200">
+                <button type="submit" class="button primary">Търси</button>
+            </form>
+
+            <div class="examples">
+                <span>Пробвай:</span>
+                <button type="button" class="chip" data-example="Ваньо Петров">Ваньо Петров</button>
+                <button type="button" class="chip" data-example="Ivan Petrov">Ivan Petrov</button>
+                <button type="button" class="chip" data-example="аз съм Мария Иванова">аз съм Мария Иванова</button>
+                <button type="button" class="chip" data-example="гошо димитров">гошо димитров</button>
+                <button type="button" class="chip" data-example="Петров">Петров</button>
+            </div>
+        </section>
+
+        <section class="results-area" aria-live="polite">
+            <div id="searchStatus"></div>
+            <div id="results" class="cards"></div>
+        </section>
+
+        <section id="librarySection" class="panel" hidden>
+            <div class="panel-head">
+                <h2>Моята библиотека</h2>
+                <button id="refreshLibraryButton" class="button ghost small">Опресни</button>
+            </div>
+            <div id="library" class="rows"></div>
+        </section>
+
+        <details class="panel advanced">
+            <summary>Разширено търсене по състезание и година</summary>
+
+            <form id="advancedForm" class="advanced-form">
+                <input type="text" id="participant" placeholder="Име (точно съдържание)">
+                <input type="text" id="competition" placeholder="Състезание">
+                <input type="number" id="year" placeholder="Година" min="1990" max="2100">
+                <button type="submit" class="button primary">Търси</button>
+            </form>
+
+            <div id="advancedResults" class="rows"></div>
+        </details>
+    </main>
+
+    <footer class="footer">
+        Търсенето използва локален ИИ модел (Ollama), без външни ИИ услуги.
+    </footer>
+
+    <dialog id="accountDialog" class="dialog">
+        <form method="dialog" class="dialog-close">
+            <button class="icon-button" aria-label="Затвори">✕</button>
+        </form>
+
+        <div class="tabs" role="tablist">
+            <button type="button" class="tab active" data-tab="login" role="tab">Вход</button>
+            <button type="button" class="tab" data-tab="register" role="tab">Регистрация</button>
+        </div>
+
+        <form id="loginForm" class="auth-form" data-panel="login">
+            <input type="email" id="loginEmail" placeholder="Имейл" required autocomplete="username">
+            <input type="password" id="loginPassword" placeholder="Парола" required autocomplete="current-password">
+            <button type="submit" class="button primary">Влез</button>
+            <p id="loginMessage" class="form-message"></p>
+        </form>
+
+        <form id="registerForm" class="auth-form" data-panel="register" hidden>
+            <input type="email" id="registerEmail" placeholder="Имейл" required autocomplete="username">
+            <input type="password" id="registerPassword" placeholder="Парола" required autocomplete="new-password">
+            <p class="hint">Поне 6 знака, с главна и малка буква, цифра и символ.</p>
+            <button type="submit" class="button primary">Създай акаунт</button>
+            <p id="registerMessage" class="form-message"></p>
+        </form>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" hidden></div>
+
+    <script src="script.js"></script>
+</body>
+</html>
