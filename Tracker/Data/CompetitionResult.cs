@@ -7,4 +7,7 @@ public class CompetitionResult
     public string Competition { get; set; } = string.Empty;
     public int Year { get; set; }
     public decimal? Score { get; set; }
+    public int? Grade { get; set; }
+    public int? Place { get; set; }
+    public string? SourceUrl { get; set; }
 }

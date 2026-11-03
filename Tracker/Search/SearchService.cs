@@ -2,7 +2,8 @@ using MySqlConnector;
 
 namespace Tracker.Search;
 
-public record StudentResult(int Id, string Competition, int Year, decimal? Score);
+public record StudentResult(int Id, string Competition, int Year, decimal? Score,
+    int? Grade, int? Place, string? SourceUrl);
 
 public record StudentMatch(string Name, double MatchScore, IReadOnlyList<StudentResult> Results);
 
@@ -138,7 +139,7 @@ public class SearchService(QueryInterpreter interpreter, IConfiguration configur
         var parameters = names.Select((_, i) => $"@n{i}").ToList();
 
         await using var command = new MySqlCommand($"""
-            SELECT id, participant_name, competition_name, competition_year, score
+            SELECT id, participant_name, competition_name, competition_year, score, grade, place, source_url
             FROM competition_results
             WHERE participant_name IN ({string.Join(", ", parameters)})
             ORDER BY competition_year DESC, competition_name
@@ -164,7 +165,10 @@ public class SearchService(QueryInterpreter interpreter, IConfiguration configur
                 reader.GetInt32("id"),
                 reader.GetString("competition_name"),
                 reader.GetInt32("competition_year"),
-                reader.IsDBNull(reader.GetOrdinal("score")) ? null : reader.GetDecimal("score")));
+                reader.IsDBNull(reader.GetOrdinal("score")) ? null : reader.GetDecimal("score"),
+                reader.IsDBNull(reader.GetOrdinal("grade")) ? null : reader.GetInt32("grade"),
+                reader.IsDBNull(reader.GetOrdinal("place")) ? null : reader.GetInt32("place"),
+                reader.IsDBNull(reader.GetOrdinal("source_url")) ? null : reader.GetString("source_url")));
         }
 
         return byName;
