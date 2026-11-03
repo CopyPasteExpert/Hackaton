@@ -41,6 +41,9 @@
 
 * { box-sizing: border-box; }
 
+/* Classes that set display (e.g. .auth-form) must not override [hidden]. */
+[hidden] { display: none !important; }
+
 body {
     margin: 0;
     background: var(--bg);
