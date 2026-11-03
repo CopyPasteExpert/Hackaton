@@ -146,6 +146,35 @@ public class RowValidatorTests
         Assert.Equal(1, result.Place);
     }
 
+    private static ExtractedRow[] Scores(params int?[] scores) =>
+        scores.Select((s, i) => new ExtractedRow($"Ученик Номер{i}", 10, s, null)).ToArray();
+
+    [Fact]
+    public void IsRankingOrder_Descending_True()
+    {
+        Assert.True(RowValidator.IsRankingOrder(Scores(42, 42, 37, 30, 22)));
+    }
+
+    [Fact]
+    public void IsRankingOrder_OneTableBreak_True()
+    {
+        // End of the 9-12 grade table, then the 7th grade table starts.
+        Assert.True(RowValidator.IsRankingOrder(Scores(14, 13, 13, 15, 14, 12)));
+    }
+
+    [Fact]
+    public void IsRankingOrder_FictitiousNumbers_False()
+    {
+        // The model read the "Фик.№" column instead of the total.
+        Assert.False(RowValidator.IsRankingOrder(Scores(250, 262, 219, 247, 268, 257, 223)));
+    }
+
+    [Fact]
+    public void IsRankingOrder_IgnoresMissingScores()
+    {
+        Assert.True(RowValidator.IsRankingOrder(Scores(42, null, 37, null, 22)));
+    }
+
     [Theory]
     [InlineData(0)]
     [InlineData(13)]

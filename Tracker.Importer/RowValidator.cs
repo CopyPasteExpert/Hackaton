@@ -36,6 +36,18 @@ public static partial class RowValidator
         return new ValidatedRow(name, grade, score, CheckPlace(row.Place, score, pageRows), RowStatus.Ok);
     }
 
+    // Protocols are rankings, so totals go down the page. One rise is allowed
+    // where a second table starts on the same page. More rises mean the model
+    // read another column (a work's fictitious number looks like a plausible
+    // score and sits on the same line, so the per-row check cannot catch it).
+    public static bool IsRankingOrder(IReadOnlyList<ExtractedRow> rows)
+    {
+        var scores = rows.Where(r => r.Score.HasValue).Select(r => r.Score!.Value).ToList();
+        var rises = scores.Zip(scores.Skip(1)).Count(pair => pair.Second > pair.First);
+
+        return rises <= 1;
+    }
+
     // The score must be one of the words on the same text line as the name.
     private static bool ScoreIsOnNameLine(string text, string name, decimal score)
     {

@@ -81,6 +81,31 @@ public class RowExtractorTests
     }
 
     [Fact]
+    public async Task Extract_PromptNamesTotalColumnNotFictitiousNumber()
+    {
+        // Without naming the column the model took "Фик.№2" (e.g. 250) for the total (42).
+        var handler = new QueueHandler(ModelSays(ValidOutput));
+
+        await Create(handler).ExtractAsync("текст");
+
+        var prompt = JsonDocument.Parse(handler.LastBody!).RootElement.GetProperty("prompt").GetString();
+        Assert.Contains("Общ бр. точки", prompt);
+        Assert.Contains("Фик.№", prompt);
+    }
+
+    [Fact]
+    public async Task Extract_WithCorrection_TellsModelWhichNumbersWereWrong()
+    {
+        var handler = new QueueHandler(ModelSays(ValidOutput));
+
+        await Create(handler).ExtractAsync("текст", wrongScores: [149, 115, 164]);
+
+        var prompt = JsonDocument.Parse(handler.LastBody!).RootElement.GetProperty("prompt").GetString()!;
+        Assert.Contains("149, 115, 164", prompt);
+        Assert.EndsWith("текст", prompt);
+    }
+
+    [Fact]
     public async Task Extract_SendsModelAndJsonFormat()
     {
         var handler = new QueueHandler(ModelSays(ValidOutput));

@@ -14,4 +14,5 @@ public static class RowStatus
     public const string NameFormat = "name-format";
     public const string ScoreNotOnLine = "score-not-on-line";
     public const string PageNotRead = "page-not-read";
+    public const string ScoreOrder = "score-order";
 }

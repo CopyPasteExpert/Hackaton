@@ -18,7 +18,7 @@ public class RowExtractor(HttpClient http, OllamaOptions options)
         Извлечи ВСИЧКИ ученици от таблицата. За всеки върни:
         name (трите имена точно както са в текста),
         grade (клас, цяло число),
-        score (общ брой точки, число; това е общият брой точки, не оценката),
+        score (числото от колоната „Общ бр. точки“ или „Общ брой точки“; НЕ числото от колоните „Фик.№“ или „Фиктивен номер“, които са номера на работи, и НЕ оценката),
         place (място в класирането, цяло число или null; това е мястото, не оценката).
         Не измисляй ученици.
         Върни само JSON: {"rows": [{"name": "...", "grade": 0, "score": 0, "place": null}]}
@@ -27,15 +27,24 @@ public class RowExtractor(HttpClient http, OllamaOptions options)
 
         """;
 
-    public async Task<IReadOnlyList<ExtractedRow>> ExtractAsync(string pageText, CancellationToken ct = default)
+    // wrongScores: totals from an earlier attempt that were not in ranking order,
+    // i.e. the model read another column; they are quoted back to it as a correction.
+    public async Task<IReadOnlyList<ExtractedRow>> ExtractAsync(
+        string pageText, IReadOnlyList<decimal>? wrongScores = null, CancellationToken ct = default)
     {
         string? lastError = null;
+        var correction = wrongScores is { Count: > 0 }
+            ? "Внимание: при предишен опит върна за score числа като " +
+              string.Join(", ", wrongScores.Take(5).Select(s => s.ToString("0.##", CultureInfo.InvariantCulture))) +
+              ". Те НЕ са от колоната „Общ бр. точки“: в класирането общите точки намаляват отгоре надолу. " +
+              "Вземи score само от колоната „Общ бр. точки“ или „Общ брой точки“.\n\n"
+            : "";
 
         for (var attempt = 1; attempt <= Attempts; attempt++)
         {
             try
             {
-                return await AskModelAsync(pageText, ct);
+                return await AskModelAsync(correction + Prompt + pageText, ct);
             }
             catch (Exception ex) when (ex is HttpRequestException or JsonException or KeyNotFoundException
                                            or InvalidOperationException && !ct.IsCancellationRequested)
@@ -47,12 +56,12 @@ public class RowExtractor(HttpClient http, OllamaOptions options)
         throw new ExtractionFailedException($"The model did not return valid rows after {Attempts} attempts: {lastError}");
     }
 
-    private async Task<IReadOnlyList<ExtractedRow>> AskModelAsync(string pageText, CancellationToken ct)
+    private async Task<IReadOnlyList<ExtractedRow>> AskModelAsync(string prompt, CancellationToken ct)
     {
         var request = new
         {
             model = options.Model,
-            prompt = Prompt + pageText,
+            prompt,
             format = "json",
             stream = false,
             options = new { temperature = 0, num_ctx = 8192 }
