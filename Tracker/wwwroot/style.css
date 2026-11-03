@@ -351,6 +351,10 @@ button, input { font: inherit; color: inherit; }
 
 .row-sub { color: var(--muted); font-size: .85rem; }
 
+.row-details .place { color: var(--gold); font-weight: 700; }
+
+.row-details .source { color: var(--accent); text-underline-offset: 2px; }
+
 .score { font-weight: 800; font-variant-numeric: tabular-nums; }
 
 .score.none { font-weight: 500; color: var(--muted); font-size: .85rem; }

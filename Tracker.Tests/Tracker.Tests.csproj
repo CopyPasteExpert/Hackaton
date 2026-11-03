@@ -19,6 +19,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Tracker\Tracker.csproj" />
+    <ProjectReference Include="..\Tracker.Importer\Tracker.Importer.csproj" />
   </ItemGroup>
 
 </Project>

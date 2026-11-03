@@ -14,13 +14,17 @@ public static class NameMatcher
     // a shared "-ова" ending alone must not produce "Имахте предвид…?".
     public const double SuggestMinWordSimilarity = 0.75;
 
+    // A match needs every query word to be close, not just a good average: an
+    // exact first name plus a surname sharing only "-ова" is another student.
+    public const double MatchMinWordSimilarity = 0.85;
+
     // Query words shorter than this carry too little signal ("и", "a").
     private const int MinWordLength = 2;
 
     public static MatchResult Match(string query, IEnumerable<string> candidates)
     {
         var queryWords = NameNormalizer.Normalize(query)
-            .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .Split([' ', '-'], StringSplitOptions.RemoveEmptyEntries)
             .Where(w => w.Length >= MinWordLength)
             .ToArray();
 
@@ -41,7 +45,7 @@ public static class NameMatcher
             .ToList();
 
         var matches = scored
-            .Where(s => s.Match.Score >= MatchThreshold)
+            .Where(s => s.Match.Score >= MatchThreshold && s.Weakest >= MatchMinWordSimilarity)
             .Select(s => s.Match)
             .ToList();
 
@@ -59,6 +63,11 @@ public static class NameMatcher
         return new MatchResult(matches, didYouMean);
     }
 
+    // Some protocols list a student with two names only; the student types all
+    // three. One extra query word is then left out, at a small cost, so the
+    // exact three-name entry still ranks first when both exist.
+    private const double MissingMiddleNamePenalty = 0.98;
+
     // Pairs each query word with a different word of the candidate, best pairs
     // first, so word order does not matter but one candidate word cannot stand
     // in for two query words ("Иван Иванов" is not "Иван Петров"). Returns the
@@ -67,7 +76,7 @@ public static class NameMatcher
     private static (double Average, double Weakest) Score(string[] queryWords, string candidate)
     {
         var candidateWords = NameNormalizer.Normalize(candidate)
-            .Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            .Split([' ', '-'], StringSplitOptions.RemoveEmptyEntries);
 
         if (candidateWords.Length == 0)
         {
@@ -92,6 +101,14 @@ public static class NameMatcher
 
             queryUsed[pair.Query] = candidateUsed[pair.Candidate] = true;
             best[pair.Query] = pair.Similarity;
+        }
+
+        var unpaired = queryUsed.Count(used => !used);
+
+        if (unpaired == 1 && queryWords.Length >= 3 && candidateWords.Length >= 2)
+        {
+            var paired = best.Where((_, i) => queryUsed[i]).ToArray();
+            return (paired.Average() * MissingMiddleNamePenalty, paired.Min());
         }
 
         return (best.Average(), best.Min());

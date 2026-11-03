@@ -46,6 +46,28 @@ function resultRow(result, action) {
     if (result.participant) {
         text.append(el("div", "row-sub", result.participant));
     }
+
+    // "1 място · 11 клас · Протокол (МОН)", with only the parts we have.
+    const details = [];
+    if (result.place) details.push(el("span", "place", `${result.place} място`));
+    if (result.grade) details.push(el("span", null, `${result.grade} клас`));
+    if (typeof result.sourceUrl === "string" && result.sourceUrl.startsWith("https://")) {
+        const link = el("a", "source", "Протокол (МОН)");
+        link.href = result.sourceUrl;
+        link.target = "_blank";
+        link.rel = "noopener";
+        details.push(link);
+    }
+
+    if (details.length > 0) {
+        const line = el("div", "row-sub row-details");
+        details.forEach((part, i) => {
+            if (i > 0) line.append(" · ");
+            line.append(part);
+        });
+        text.append(line);
+    }
+
     row.append(text);
 
     const score = formatScore(result.score);

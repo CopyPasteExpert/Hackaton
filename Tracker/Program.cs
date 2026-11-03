@@ -120,7 +120,7 @@ app.MapGet("/api/results", async (
 
     string sql = @"
         SELECT id, participant_name, competition_name,
-               competition_year, score
+               competition_year, score, grade, place, source_url
         FROM competition_results
         WHERE 1 = 1";
 
@@ -178,7 +178,16 @@ app.MapGet("/api/results", async (
             year = reader.GetInt32("competition_year"),
             score = reader.IsDBNull(reader.GetOrdinal("score"))
                 ? (decimal?)null
-                : reader.GetDecimal("score")
+                : reader.GetDecimal("score"),
+            grade = reader.IsDBNull(reader.GetOrdinal("grade"))
+                ? (int?)null
+                : reader.GetInt32("grade"),
+            place = reader.IsDBNull(reader.GetOrdinal("place"))
+                ? (int?)null
+                : reader.GetInt32("place"),
+            sourceUrl = reader.IsDBNull(reader.GetOrdinal("source_url"))
+                ? null
+                : reader.GetString("source_url")
         });
     }
 
@@ -247,7 +256,10 @@ app.MapGet("/api/saved-results", async (
                              participant_name AS Participant,
                              competition_name AS Competition,
                              competition_year AS Year,
-                             score AS Score
+                             score AS Score,
+                             grade AS Grade,
+                             place AS Place,
+                             source_url AS SourceUrl
                       FROM competition_results"),
             saved => saved.ResultId,
             result => result.Id,
@@ -258,7 +270,10 @@ app.MapGet("/api/saved-results", async (
                 participant = result.Participant,
                 competition = result.Competition,
                 year = result.Year,
-                score = result.Score
+                score = result.Score,
+                grade = result.Grade,
+                place = result.Place,
+                sourceUrl = result.SourceUrl
             })
         .ToListAsync();
 

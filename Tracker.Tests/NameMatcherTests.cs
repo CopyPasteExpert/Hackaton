@@ -103,6 +103,49 @@ public class NameMatcherTests
     }
 
     [Fact]
+    public void Match_SameFirstNameOtherSurname_NotAMatch()
+    {
+        // Real data: "Кирова" and "Петрова" share only the "-ова" ending; the
+        // exact first name must not carry them over the match threshold.
+        string[] candidates = [.. Candidates, "Зорница Цветанова Петрова"];
+
+        var result = NameMatcher.Match("Зорница Кирова", candidates);
+
+        Assert.Empty(result.Matches);
+    }
+
+    [Fact]
+    public void Match_MiddleNameMissingInDatabase_Found()
+    {
+        // Some protocols list only two names; the student types all three.
+        string[] candidates = [.. Candidates, "Дарина Костадинова"];
+
+        var result = NameMatcher.Match("Дарина Иванова Костадинова", candidates);
+
+        Assert.Equal("Дарина Костадинова", result.Matches[0].Name);
+    }
+
+    [Fact]
+    public void Match_FullThreeNameMatch_RanksAboveTwoNameEntry()
+    {
+        string[] candidates = [.. Candidates, "Иван Колев", "Иван Петров Колев"];
+
+        var result = NameMatcher.Match("Иван Петров Колев", candidates);
+
+        Assert.Equal("Иван Петров Колев", result.Matches[0].Name);
+    }
+
+    [Theory]
+    [InlineData("Ана Неда Караджова", "Ана-Неда Георгиева Караджова")]
+    [InlineData("Асен Христов", "Йоан-Асен Владимиров Христов")]
+    public void Match_HyphenatedFirstNameTypedWithSpace_Found(string query, string name)
+    {
+        var result = NameMatcher.Match(query, [.. Candidates, name]);
+
+        Assert.Equal(name, result.Matches[0].Name);
+    }
+
+    [Fact]
     public void Match_CandidateWordCountsOnlyOnce()
     {
         // "иван" and "иванов" must not both be scored against the same "Иван".

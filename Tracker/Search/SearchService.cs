@@ -2,7 +2,8 @@ using MySqlConnector;
 
 namespace Tracker.Search;
 
-public record StudentResult(int Id, string Competition, int Year, decimal? Score);
+public record StudentResult(int Id, string Competition, int Year, decimal? Score,
+    int? Grade, int? Place, string? SourceUrl);
 
 public record StudentMatch(string Name, double MatchScore, IReadOnlyList<StudentResult> Results);
 
@@ -52,8 +53,14 @@ public class SearchService(QueryInterpreter interpreter, IConfiguration configur
     public static CombinedMatch Combine(
         string query, InterpretedQuery interpreted, IReadOnlyList<string> candidates)
     {
-        var (baseline, baselineDidYouMean) =
-            MatchAll([query, .. NicknameDictionary.Expand(query)], candidates);
+        // Without the model, common words around a name ("казвам се …") would
+        // count as name words, so the baseline also tries the query without them.
+        var stripped = StripFillerWords(query);
+        string[] readings = stripped.Length > 0 && stripped != NameNormalizer.Normalize(query)
+            ? [query, stripped, .. NicknameDictionary.Expand(query), .. NicknameDictionary.Expand(stripped)]
+            : [query, .. NicknameDictionary.Expand(query)];
+
+        var (baseline, baselineDidYouMean) = MatchAll(readings, candidates);
 
         // The model's suggestion is dropped: it would be built from a name the
         // model may have made up, not from what the user typed.
@@ -86,6 +93,19 @@ public class SearchService(QueryInterpreter interpreter, IConfiguration configur
             ? new CombinedMatch(matches, null, true, $"Разбрах „{query}“ като „{matches[0].Name}“")
             : new CombinedMatch(matches, null, false, null);
     }
+
+    // Words people put around their name when they write a sentence. None of
+    // them is a Bulgarian name.
+    private static readonly HashSet<string> FillerWords =
+    [
+        "аз", "съм", "казвам", "се", "името", "ми", "е", "моето", "търся", "покажи",
+        "резултатите", "резултати", "на", "за", "здравей", "здрасти", "моля", "постиженията"
+    ];
+
+    private static string StripFillerWords(string query) =>
+        string.Join(' ', NameNormalizer.Normalize(query)
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .Where(w => !FillerWords.Contains(w)));
 
     // Best score per candidate over several readings of the query.
     private static (Dictionary<string, double> Best, string? DidYouMean) MatchAll(
@@ -138,7 +158,7 @@ public class SearchService(QueryInterpreter interpreter, IConfiguration configur
         var parameters = names.Select((_, i) => $"@n{i}").ToList();
 
         await using var command = new MySqlCommand($"""
-            SELECT id, participant_name, competition_name, competition_year, score
+            SELECT id, participant_name, competition_name, competition_year, score, grade, place, source_url
             FROM competition_results
             WHERE participant_name IN ({string.Join(", ", parameters)})
             ORDER BY competition_year DESC, competition_name
@@ -164,7 +184,10 @@ public class SearchService(QueryInterpreter interpreter, IConfiguration configur
                 reader.GetInt32("id"),
                 reader.GetString("competition_name"),
                 reader.GetInt32("competition_year"),
-                reader.IsDBNull(reader.GetOrdinal("score")) ? null : reader.GetDecimal("score")));
+                reader.IsDBNull(reader.GetOrdinal("score")) ? null : reader.GetDecimal("score"),
+                reader.IsDBNull(reader.GetOrdinal("grade")) ? null : reader.GetInt32("grade"),
+                reader.IsDBNull(reader.GetOrdinal("place")) ? null : reader.GetInt32("place"),
+                reader.IsDBNull(reader.GetOrdinal("source_url")) ? null : reader.GetString("source_url")));
         }
 
         return byName;
