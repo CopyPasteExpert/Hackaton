@@ -115,6 +115,27 @@ public class NameMatcherTests
     }
 
     [Fact]
+    public void Match_MiddleNameMissingInDatabase_Found()
+    {
+        // Some protocols list only two names; the student types all three.
+        string[] candidates = [.. Candidates, "Дарина Костадинова"];
+
+        var result = NameMatcher.Match("Дарина Иванова Костадинова", candidates);
+
+        Assert.Equal("Дарина Костадинова", result.Matches[0].Name);
+    }
+
+    [Fact]
+    public void Match_FullThreeNameMatch_RanksAboveTwoNameEntry()
+    {
+        string[] candidates = [.. Candidates, "Иван Колев", "Иван Петров Колев"];
+
+        var result = NameMatcher.Match("Иван Петров Колев", candidates);
+
+        Assert.Equal("Иван Петров Колев", result.Matches[0].Name);
+    }
+
+    [Fact]
     public void Match_CandidateWordCountsOnlyOnce()
     {
         // "иван" and "иванов" must not both be scored against the same "Иван".

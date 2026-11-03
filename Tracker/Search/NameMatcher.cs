@@ -63,6 +63,11 @@ public static class NameMatcher
         return new MatchResult(matches, didYouMean);
     }
 
+    // Some protocols list a student with two names only; the student types all
+    // three. One extra query word is then left out, at a small cost, so the
+    // exact three-name entry still ranks first when both exist.
+    private const double MissingMiddleNamePenalty = 0.98;
+
     // Pairs each query word with a different word of the candidate, best pairs
     // first, so word order does not matter but one candidate word cannot stand
     // in for two query words ("Иван Иванов" is not "Иван Петров"). Returns the
@@ -96,6 +101,14 @@ public static class NameMatcher
 
             queryUsed[pair.Query] = candidateUsed[pair.Candidate] = true;
             best[pair.Query] = pair.Similarity;
+        }
+
+        var unpaired = queryUsed.Count(used => !used);
+
+        if (unpaired == 1 && queryWords.Length >= 3 && candidateWords.Length >= 2)
+        {
+            var paired = best.Where((_, i) => queryUsed[i]).ToArray();
+            return (paired.Average() * MissingMiddleNamePenalty, paired.Min());
         }
 
         return (best.Average(), best.Min());
