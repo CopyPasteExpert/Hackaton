@@ -44,7 +44,7 @@ powershell -ExecutionPolicy Bypass -File start.ps1
    ```bash
    dotnet tool restore
    dotnet ef database update --project Tracker
-   mariadb -uroot -p --default-character-set=utf8mb4 < db/seed.sql
+   mariadb -uroot -p --default-character-set=utf8mb4 < db/schema.sql
    ```
 3. Моделът (размерът е в `appsettings.json` → `Ollama:Model`):
    ```bash

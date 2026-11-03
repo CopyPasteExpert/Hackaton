@@ -4,3 +4,5 @@ obj/
 *.user
 TestResults/
 appsettings.Development.json
+Tracker.Importer/cache/
+Tracker.Importer/import-review.csv
