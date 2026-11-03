@@ -14,3 +14,13 @@ public record Table(int Page, int HeaderId, IReadOnlyList<Column> Columns, IRead
 
 // Indexes into Table.Columns.
 public record ColumnMap(int Name, int? Grade, int Score, int? Place);
+
+public static class ProtocolNumber
+{
+    // Protocol numbers use a decimal comma ("18,50") or point ("18.50").
+    public static decimal? Parse(string text) =>
+        decimal.TryParse(text.Trim().Replace(',', '.'), System.Globalization.NumberStyles.AllowDecimalPoint,
+            System.Globalization.CultureInfo.InvariantCulture, out var value)
+            ? value
+            : null;
+}
