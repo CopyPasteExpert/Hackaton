@@ -55,10 +55,13 @@ public class ColumnMapperTests
     [Fact]
     public async Task Map_UnknownLabel_RetriesThenNull()
     {
-        var handler = new QueueHandler("""{"name":"Имена","grade":null,"score":"Точки","place":null}""");
+        var handler = new QueueHandler("""{"name":"Имена","grade":null,"score":"Резултат","place":null}""");
 
-        Assert.Null(await Create(handler).MapAsync(Sample));
+        var mapper = Create(handler);
+
+        Assert.Null(await mapper.MapAsync(Sample));
         Assert.Equal(2, handler.Prompts.Count);
+        Assert.Contains("Резултат", mapper.LastProblem);
     }
 
     [Fact]
@@ -90,6 +93,21 @@ public class ColumnMapperTests
 
         Assert.Null(await Create(handler).MapAsync(Sample));
         Assert.Equal(2, handler.Prompts.Count);
+    }
+
+    [Fact]
+    public async Task Map_AnswerContainsShortLabel_Accepted()
+    {
+        // Biology p.7: the header was cut to "брой"; the model answers with the full wording.
+        var table = Sample with
+        {
+            Columns = [.. Sample.Columns.Take(4), new Column("брой", 700, 710)]
+        };
+        var handler = new QueueHandler("""{"name":"Имена","grade":"Клас","score":"Общ брой точки","place":null}""");
+
+        var map = await Create(handler).MapAsync(table);
+
+        Assert.Equal(4, map!.Score);
     }
 
     [Fact]

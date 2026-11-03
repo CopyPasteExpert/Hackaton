@@ -13,6 +13,7 @@ public static partial class TableReader
     private const double AnchorTolerance = 12;   // rank numbers in one column
     private const double JoinDistance = 9;       // a wrapped name and the line of its row
     private const double HeaderLineGap = 12;     // lines of a multi-line header
+    private const int MaxHeaderLines = 20;
 
     [GeneratedRegex(@"^\d+\.?$")]
     private static partial Regex RankNumber();
@@ -111,7 +112,8 @@ public static partial class TableReader
 
             header.Add(lines[i]);
 
-            while (header.Count < 4 && i + 1 < lines.Count
+            // Labels printed letter by letter make some headers many lines tall.
+            while (header.Count < MaxHeaderLines && i + 1 < lines.Count
                    && header[^1].Y - lines[i + 1].Y <= HeaderLineGap
                    && !HasNumber(lines[i + 1]) && !IsHeaderLine(lines[i + 1]))
             {
@@ -169,12 +171,30 @@ public static partial class TableReader
             }
         }
 
-        foreach (var line in lines)
+        return lines.SelectMany(SplitOverlapping)
+            .Select(l => l with { Words = l.Words.OrderBy(w => w.Left).ToList() })
+            .ToList();
+    }
+
+    // Two words of one text line cannot sit over each other. When they do, the
+    // tolerance has caught two lines (a wrapped surname 2.3 pt above the next
+    // row's first name): split at the largest gap between baselines.
+    private static IEnumerable<Line> SplitOverlapping(Line line)
+    {
+        var overlap = line.Words.Any(a => line.Words.Any(b =>
+            !ReferenceEquals(a, b) && a.Left < b.Right - 0.5 && a.Right > b.Left + 0.5));
+
+        if (!overlap)
         {
-            line.Words.Sort((a, b) => a.Left.CompareTo(b.Left));
+            return [line];
         }
 
-        return lines;
+        var words = line.Words.OrderByDescending(w => w.Bottom).ToList();
+        var split = Enumerable.Range(1, words.Count - 1)
+            .MaxBy(i => words[i - 1].Bottom - words[i].Bottom);
+
+        return SplitOverlapping(new Line(words[0].Bottom, words.Take(split).ToList()))
+            .Concat(SplitOverlapping(new Line(words[split].Bottom, words.Skip(split).ToList())));
     }
 
     // The x of the rank column: where most lines that start with a whole number start.
@@ -194,19 +214,36 @@ public static partial class TableReader
         line.Words.Any(w => HeaderMarks.Contains(w.Text)
                             || HeaderWords.Any(h => w.Text.StartsWith(h, StringComparison.OrdinalIgnoreCase)));
 
-    // Each row: its anchor line plus nearby lines without a rank number (a name
-    // printed on its own line), split into cells.
+    // Each row: its anchor line plus the lines that continue it, split into cells.
+    // A line between two rows continues the row above it (biology prints the
+    // end of a long name, or the numbers, below the row's first line). The
+    // exception is a line just above a row that has nothing in those columns:
+    // there the row's name was printed above its numbers (physics).
     private static List<List<Cell>> BuildRows(List<Line> lines, List<Line> anchors)
     {
+        const double AfterLastRow = 20;
+
         var rowLines = anchors.ToDictionary(a => a, a => new List<Line> { a });
+        var anchorStarts = ColumnStarts(anchors.Select(a => new List<Line> { a }).ToList());
 
-        foreach (var line in lines.Except(anchors))
+        // A continuation stays inside the columns; a footnote or a title runs
+        // across the start of a column.
+        bool CrossesColumn(Line line) => ToCells(line, anchorStarts)
+            .Any(c => anchorStarts.Any(x => x > c.Left + 2 && x < c.Right - 2));
+
+        foreach (var line in lines.Except(anchors).Where(l => !CrossesColumn(l)))
         {
-            var nearest = anchors.MinBy(a => Math.Abs(a.Y - line.Y))!;
+            var above = anchors.Where(a => a.Y > line.Y).MinBy(a => a.Y);
+            var below = anchors.Where(a => a.Y < line.Y).MaxBy(a => a.Y);
 
-            if (Math.Abs(nearest.Y - line.Y) <= JoinDistance)
+            Line? owner =
+                below != null && line.Y - below.Y <= JoinDistance && !Overlaps(line, below) ? below
+                : above != null && (below != null || above.Y - line.Y <= AfterLastRow) ? above
+                : null;
+
+            if (owner != null)
             {
-                rowLines[nearest].Add(line);
+                rowLines[owner].Add(line);
             }
         }
 
@@ -214,6 +251,10 @@ public static partial class TableReader
 
         return anchors.Select(a => rowLines[a].SelectMany(l => ToCells(l, starts)).ToList()).ToList();
     }
+
+    // Whether any word of one line sits over a word of the other.
+    private static bool Overlaps(Line a, Line b) =>
+        a.Words.Any(x => b.Words.Any(y => x.Left < y.Right + 2 && x.Right > y.Left - 2));
 
     // x positions where a word starts in most rows: column starts. A school that
     // begins 3 pt after a long surname still begins at the same x as the schools

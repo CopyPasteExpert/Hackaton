@@ -197,6 +197,89 @@ public class TableReaderTests
     }
 
     [Fact]
+    public void Read_WrappedSurnameBelowJoinsRowAbove()
+    {
+        // Biology: a long name continues on the line below its row, closer to
+        // the next row than to its own.
+        var page = Page(
+            Header(),
+            [W("1", 50, 495), W("11", 75, 495), W("Василена", 88, 495), W("Климентова", 131, 495), W("ПМГ", 240, 495), W("88,8", 700, 495)],
+            [W("Кърчанова", 88, 486)],
+            Row("2", "10", "Йордан", "Владимиров", "Каменов", "СУ", "88,6", 481));
+
+        var table = Assert.Single(TableReader.Read([page]));
+
+        Assert.Equal("Василена Климентова Кърчанова", table.Rows[0].Values[2]);
+        Assert.Equal("Йордан Владимиров Каменов", table.Rows[1].Values[2]);
+    }
+
+    [Fact]
+    public void Read_NumbersAndSurnameOnLinesBelowJoinRowAbove()
+    {
+        var page = Page(
+            Header(),
+            [W("1", 50, 495), W("11", 75, 495), W("Константин", 88, 495), W("Владимиров", 141, 495), W("ПМГ", 240, 495)],
+            [W("88,9", 700, 488)],
+            [W("Стоянов", 88, 482)],
+            Row("2", "10", "Йордан", "Владимиров", "Каменов", "СУ", "88,6", 470));
+
+        var table = Assert.Single(TableReader.Read([page]));
+
+        Assert.Equal(["1", "11", "Константин Владимиров Стоянов", "ПМГ", "88,9"], table.Rows[0].Values);
+    }
+
+    [Fact]
+    public void Read_SurnameJustAboveNextRowBaseline()
+    {
+        // Real biology positions: the wrapped surname sits only 2.3 pt above the
+        // next row's baseline, at the same x as the next row's first name.
+        var page = Page(
+            Header(510),
+            [W("1", 50, 495.8), W("11", 75, 495.8), W("Константин", 88, 495.7), W("ПМГ", 240, 495.8), W("88,9", 700, 494.4)],
+            [W("Стоянов", 88, 481.3)],
+            [W("2", 50, 479.0), W("10", 75, 479.0), W("Василена", 88, 478.9), W("СУ", 240, 479.0), W("88,8", 700, 477.6)],
+            [W("Кърчанова", 88, 464.5)],
+            [W("3", 50, 462.2), W("9", 75, 462.2), W("Йордан", 88, 462.1), W("СУ", 240, 462.2), W("88,6", 700, 460.8)]);
+
+        var table = Assert.Single(TableReader.Read([page]));
+
+        Assert.Equal(["Константин Стоянов", "Василена Кърчанова", "Йордан"], table.Rows.Select(r => r.Values[2]));
+    }
+
+    [Fact]
+    public void Read_FootnoteAfterLastRow_Ignored()
+    {
+        // A footnote under the table runs across the grade and school columns.
+        var page = Page(
+            FirstPage(),
+            [W("*", 88, 457), W("съгласно", 94, 457), W("регламента", 196, 457), W("на", 250, 457), W("олимпиадата", 263, 457)]);
+
+        var table = Assert.Single(TableReader.Read([page]));
+
+        Assert.Equal(["3", "9", "Мария Тодорова Петрова", "ПМГ", "30"], table.Rows[2].Values);
+    }
+
+    [Fact]
+    public void Read_TallHeaderWithVerticalLabels_KeepsAllLabelLines()
+    {
+        // Biology: some labels are printed letter by letter, one per line, so
+        // the header is many lines tall; "Общ брой точки" ends near its bottom.
+        var page = Page(
+            [W("№", 50, 560), W("Имена", 100, 560), W("Общ", 700, 560)],
+            [W("а", 400, 550), W("брой", 700, 550)],
+            [W("б", 400, 540)],
+            [W("в", 400, 530)],
+            [W("г", 400, 520)],
+            [W("д", 400, 510), W("точки", 700, 510)],
+            [W("1", 50, 495), W("Петър", 88, 495), W("Иванов", 116, 495), W("7", 400, 495), W("42", 700, 495)],
+            [W("2", 50, 480), W("Анна", 88, 480), W("Иванова", 111, 480), W("5", 400, 480), W("37", 700, 480)]);
+
+        var table = Assert.Single(TableReader.Read([page]));
+
+        Assert.Equal("Общ брой точки", table.Columns[^1].Label);
+    }
+
+    [Fact]
     public void Read_PageWithoutTable_NoTable()
     {
         var page = Page(

@@ -30,9 +30,13 @@ public class ColumnMapper(HttpClient http, OllamaOptions options)
 
     private record Answer(string? Name, string? Grade, string? Score, string? Place);
 
+    // Why the last MapAsync returned null, for the extract log.
+    public string? LastProblem { get; private set; }
+
     public async Task<ColumnMap?> MapAsync(Table table, CancellationToken ct = default)
     {
         var correction = "";
+        LastProblem = null;
 
         for (var attempt = 1; attempt <= Attempts; attempt++)
         {
@@ -45,6 +49,7 @@ public class ColumnMapper(HttpClient http, OllamaOptions options)
             catch (Exception ex) when (ex is HttpRequestException or JsonException or KeyNotFoundException
                                            or InvalidOperationException && !ct.IsCancellationRequested)
             {
+                LastProblem = $"no valid answer from the model ({ex.Message})";
                 continue;
             }
 
@@ -52,9 +57,11 @@ public class ColumnMapper(HttpClient http, OllamaOptions options)
 
             if (map != null)
             {
+                LastProblem = null;
                 return map;
             }
 
+            LastProblem = problem;
             correction = $"Внимание: предишният отговор не е верен: {problem}\n\n";
         }
 
@@ -114,9 +121,31 @@ public class ColumnMapper(HttpClient http, OllamaOptions options)
     // numbers that go down the table like a ranking.
     private static (ColumnMap? Map, string? Problem) Check(Table table, Answer answer)
     {
-        int? Index(string? label) => label == null
-            ? null
-            : table.Columns.Select((c, i) => (c, i)).Where(x => x.c.Label == label).Select(x => (int?)x.i).FirstOrDefault();
+        // Exact label first. Otherwise the one column whose label is part of the
+        // answer or the other way round: a header cut to "брой" while the model
+        // answers "Общ брой точки". The value checks below still apply.
+        int? Index(string? label)
+        {
+            if (label == null)
+            {
+                return null;
+            }
+
+            var exact = table.Columns.Select((c, i) => (c, i)).Where(x => x.c.Label == label).Select(x => (int?)x.i).FirstOrDefault();
+
+            if (exact != null)
+            {
+                return exact;
+            }
+
+            var partial = table.Columns.Select((c, i) => (c, i))
+                .Where(x => x.c.Label.Length >= 3
+                            && (label.Contains(x.c.Label, StringComparison.OrdinalIgnoreCase)
+                                || x.c.Label.Contains(label, StringComparison.OrdinalIgnoreCase)))
+                .ToList();
+
+            return partial.Count == 1 ? partial[0].i : null;
+        }
 
         var name = Index(answer.Name);
         var score = Index(answer.Score);

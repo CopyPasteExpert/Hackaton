@@ -80,7 +80,7 @@ public static class ExtractCommand
                     maps[table.HeaderId] = map;
 
                     var described = map == null
-                        ? "could not map columns"
+                        ? $"could not map columns: {mapper.LastProblem}"
                         : $"name=„{table.Columns[map.Name].Label}“, score=„{table.Columns[map.Score].Label}“" +
                           (map.Place is { } p ? $", place=„{table.Columns[p].Label}“" : "") +
                           (map.Grade is { } g ? $", grade=„{table.Columns[g].Label}“" : "");
