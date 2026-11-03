@@ -43,50 +43,67 @@ public class SearchService(QueryInterpreter interpreter, IConfiguration configur
         return new SearchResponse(students, combined.DidYouMean, combined.AiUsed, combined.AiNote);
     }
 
-    // Matches both the raw text and the model's reading of it, keeping each
-    // name's best score. The model gets credit (AiUsed, AiNote) only when it
-    // changed the outcome: its best match is not what the raw text finds first.
-    // This way a wrong guess by the model never hides a plain fuzzy match, and
-    // the note always names a real student rather than the model's raw output.
+    // The baseline is the raw text plus its nickname-dictionary readings; the
+    // model's readings are matched on top, keeping each name's best score. The
+    // model gets credit (AiUsed, AiNote) only when it changed the outcome: its
+    // best match is not what the baseline finds first. On a tie the baseline
+    // wins, so a confident wrong guess by the model never hides a real match,
+    // and the note always names a real student rather than the model's output.
     public static CombinedMatch Combine(
         string query, InterpretedQuery interpreted, IReadOnlyList<string> candidates)
     {
-        var raw = NameMatcher.Match(query, candidates);
+        var (baseline, baselineDidYouMean) =
+            MatchAll([query, .. NicknameDictionary.Expand(query)], candidates);
 
-        var best = raw.Matches.ToDictionary(m => m.Name, m => m.Score);
-        string? aiDidYouMean = null;
+        var (ai, aiDidYouMean) = interpreted.AiUsed
+            ? MatchAll(interpreted.Names, candidates)
+            : ([], null);
 
-        if (interpreted.AiUsed)
-        {
-            foreach (var name in interpreted.Names)
-            {
-                var result = NameMatcher.Match(name, candidates);
-                aiDidYouMean ??= result.DidYouMean;
-
-                foreach (var match in result.Matches)
-                {
-                    best[match.Name] = Math.Max(best.GetValueOrDefault(match.Name), match.Score);
-                }
-            }
-        }
-
-        var matches = best
-            .Select(kv => new NameMatch(kv.Key, kv.Value))
+        var matches = baseline.Keys.Union(ai.Keys)
+            .Select(name => new NameMatch(name,
+                Math.Max(baseline.GetValueOrDefault(name), ai.GetValueOrDefault(name))))
             .OrderByDescending(m => m.Score)
+            .ThenByDescending(m => baseline.ContainsKey(m.Name))
             .ThenBy(m => m.Name, StringComparer.Ordinal)
             .ToList();
 
         if (matches.Count == 0)
         {
-            return new CombinedMatch([], raw.DidYouMean ?? aiDidYouMean, false, null);
+            return new CombinedMatch([], baselineDidYouMean ?? aiDidYouMean, false, null);
         }
 
-        var aiChangedOutcome = interpreted.AiUsed
-            && (raw.Matches.Count == 0 || raw.Matches[0].Name != matches[0].Name);
+        var baselineTop = baseline
+            .OrderByDescending(kv => kv.Value)
+            .ThenBy(kv => kv.Key, StringComparer.Ordinal)
+            .Select(kv => kv.Key)
+            .FirstOrDefault();
+
+        var aiChangedOutcome = interpreted.AiUsed && baselineTop != matches[0].Name;
 
         return aiChangedOutcome
             ? new CombinedMatch(matches, null, true, $"Разбрах „{query}“ като „{matches[0].Name}“")
             : new CombinedMatch(matches, null, false, null);
+    }
+
+    // Best score per candidate over several readings of the query.
+    private static (Dictionary<string, double> Best, string? DidYouMean) MatchAll(
+        IEnumerable<string> readings, IReadOnlyList<string> candidates)
+    {
+        var best = new Dictionary<string, double>();
+        string? didYouMean = null;
+
+        foreach (var reading in readings)
+        {
+            var result = NameMatcher.Match(reading, candidates);
+            didYouMean ??= result.DidYouMean;
+
+            foreach (var match in result.Matches)
+            {
+                best[match.Name] = Math.Max(best.GetValueOrDefault(match.Name), match.Score);
+            }
+        }
+
+        return (best, didYouMean);
     }
 
     private static async Task<List<string>> LoadNamesAsync(

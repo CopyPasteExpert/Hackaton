@@ -12,12 +12,36 @@ public class SearchServiceTests
     [Fact]
     public void Combine_AiFindsWhatRawCannot_CreditsAi()
     {
+        // "Мецо" is not in the nickname dictionary, so only the model can help.
         var result = SearchService.Combine(
-            "Митко", new InterpretedQuery(["Димитър"], true), Candidates);
+            "Мецо", new InterpretedQuery(["Димитър"], true), Candidates);
 
         Assert.Equal("Димитър Стоянов", result.Matches[0].Name);
         Assert.True(result.AiUsed);
-        Assert.Equal("Разбрах „Митко“ като „Димитър Стоянов“", result.AiNote);
+        Assert.Equal("Разбрах „Мецо“ като „Димитър Стоянов“", result.AiNote);
+    }
+
+    [Fact]
+    public void Combine_DictionaryNickname_FoundWithoutAi()
+    {
+        var result = SearchService.Combine(
+            "Митко", new InterpretedQuery(["Митко"], false), Candidates);
+
+        Assert.Equal("Димитър Стоянов", result.Matches[0].Name);
+        Assert.False(result.AiUsed);
+        Assert.Null(result.AiNote);
+    }
+
+    [Fact]
+    public void Combine_WrongAiExactGuess_DoesNotBeatDictionaryOnTie()
+    {
+        string[] candidates = [.. Candidates, "Радослава Михайлова"];
+
+        var result = SearchService.Combine(
+            "Митко", new InterpretedQuery(["Радослава Михайлова"], true), candidates);
+
+        Assert.Equal("Димитър Стоянов", result.Matches[0].Name);
+        Assert.False(result.AiUsed);
     }
 
     [Fact]
