@@ -24,7 +24,15 @@
 
 Кодът е в `Tracker/Search/`, а дизайнът е в `docs/superpowers/specs/`.
 
-## Пускане
+## Бързо пускане (след като всичко е настроено)
+
+```bash
+powershell -ExecutionPolicy Bypass -File start.ps1
+```
+
+Скриптът пуска MariaDB (ако не работи), Ollama (ако е инсталиран), приложението и браузъра на http://localhost:5011. Ако нещо вече работи, само го отбелязва. С `-NoBrowser` не отваря браузъра. Приложението се спира с Ctrl+C, а MariaDB и Ollama продължават да работят на заден план.
+
+## Пускане от нулата
 
 Нужни са .NET 9 SDK, MySQL или MariaDB и (по желание) [Ollama](https://ollama.com).
 
