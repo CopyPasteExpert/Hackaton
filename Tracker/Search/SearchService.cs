@@ -55,7 +55,9 @@ public class SearchService(QueryInterpreter interpreter, IConfiguration configur
         var (baseline, baselineDidYouMean) =
             MatchAll([query, .. NicknameDictionary.Expand(query)], candidates);
 
-        var (ai, aiDidYouMean) = interpreted.AiUsed
+        // The model's suggestion is dropped: it would be built from a name the
+        // model may have made up, not from what the user typed.
+        var (ai, _) = interpreted.AiUsed
             ? MatchAll(interpreted.Names, candidates)
             : ([], null);
 
@@ -69,7 +71,7 @@ public class SearchService(QueryInterpreter interpreter, IConfiguration configur
 
         if (matches.Count == 0)
         {
-            return new CombinedMatch([], baselineDidYouMean ?? aiDidYouMean, false, null);
+            return new CombinedMatch([], baselineDidYouMean, false, null);
         }
 
         var baselineTop = baseline

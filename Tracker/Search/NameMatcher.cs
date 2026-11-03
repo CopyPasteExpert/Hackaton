@@ -10,6 +10,10 @@ public static class NameMatcher
     public const double MatchThreshold = 0.85;
     public const double SuggestThreshold = 0.70;
 
+    // A suggestion needs every query word to resemble some word of the name;
+    // a shared "-ова" ending alone must not produce "Имахте предвид…?".
+    public const double SuggestMinWordSimilarity = 0.75;
+
     // Query words shorter than this carry too little signal ("и", "a").
     private const int MinWordLength = 2;
 
@@ -27,37 +31,70 @@ public static class NameMatcher
 
         var scored = candidates
             .Distinct()
-            .Select(name => new NameMatch(name, Score(queryWords, name)))
-            .OrderByDescending(m => m.Score)
-            .ThenBy(m => m.Name, StringComparer.Ordinal)
+            .Select(name =>
+            {
+                var (average, weakest) = Score(queryWords, name);
+                return (Match: new NameMatch(name, average), Weakest: weakest);
+            })
+            .OrderByDescending(s => s.Match.Score)
+            .ThenBy(s => s.Match.Name, StringComparer.Ordinal)
             .ToList();
 
-        var matches = scored.Where(m => m.Score >= MatchThreshold).ToList();
+        var matches = scored
+            .Where(s => s.Match.Score >= MatchThreshold)
+            .Select(s => s.Match)
+            .ToList();
 
         string? didYouMean = null;
 
-        if (matches.Count == 0 && scored.Count > 0
-            && scored[0].Score >= SuggestThreshold)
+        if (matches.Count == 0)
         {
-            didYouMean = scored[0].Name;
+            didYouMean = scored
+                .Where(s => s.Match.Score >= SuggestThreshold
+                    && s.Weakest >= SuggestMinWordSimilarity)
+                .Select(s => s.Match.Name)
+                .FirstOrDefault();
         }
 
         return new MatchResult(matches, didYouMean);
     }
 
-    // Average, over the query words, of each word's best similarity to any
-    // word of the candidate. Word order and missing words do not matter.
-    private static double Score(string[] queryWords, string candidate)
+    // Pairs each query word with a different word of the candidate, best pairs
+    // first, so word order does not matter but one candidate word cannot stand
+    // in for two query words ("Иван Иванов" is not "Иван Петров"). Returns the
+    // average similarity over the query words (unpaired words count as 0) and
+    // the weakest single word.
+    private static (double Average, double Weakest) Score(string[] queryWords, string candidate)
     {
         var candidateWords = NameNormalizer.Normalize(candidate)
             .Split(' ', StringSplitOptions.RemoveEmptyEntries);
 
         if (candidateWords.Length == 0)
         {
-            return 0;
+            return (0, 0);
         }
 
-        return queryWords.Average(q => candidateWords.Max(c => JaroWinkler(q, c)));
+        var pairs =
+            from q in Enumerable.Range(0, queryWords.Length)
+            from c in Enumerable.Range(0, candidateWords.Length)
+            select (Query: q, Candidate: c, Similarity: JaroWinkler(queryWords[q], candidateWords[c]));
+
+        var best = new double[queryWords.Length];
+        var queryUsed = new bool[queryWords.Length];
+        var candidateUsed = new bool[candidateWords.Length];
+
+        foreach (var pair in pairs.OrderByDescending(p => p.Similarity))
+        {
+            if (queryUsed[pair.Query] || candidateUsed[pair.Candidate])
+            {
+                continue;
+            }
+
+            queryUsed[pair.Query] = candidateUsed[pair.Candidate] = true;
+            best[pair.Query] = pair.Similarity;
+        }
+
+        return (best.Average(), best.Min());
     }
 
     public static double JaroWinkler(string a, string b)

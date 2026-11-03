@@ -77,6 +77,19 @@ public class SearchServiceTests
     }
 
     [Fact]
+    public void Combine_SuggestionNeverComesFromModelReading()
+    {
+        string[] candidates = [.. Candidates, "Тодор Василев"];
+
+        // The model rewrote an unknown name into something close to a real one.
+        var result = SearchService.Combine(
+            "Зорница Кирова", new InterpretedQuery(["Тодоп Вслв"], true), candidates);
+
+        Assert.Empty(result.Matches);
+        Assert.Null(result.DidYouMean);
+    }
+
+    [Fact]
     public void Combine_AiNotUsed_IgnoresInterpretedNames()
     {
         var result = SearchService.Combine(

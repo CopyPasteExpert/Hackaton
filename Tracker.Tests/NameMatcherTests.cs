@@ -82,6 +82,37 @@ public class NameMatcherTests
     }
 
     [Fact]
+    public void Match_TypoInEveryWord_SuggestsWithoutMatching()
+    {
+        var result = NameMatcher.Match("Тодоп Вслв", Candidates);
+
+        Assert.Empty(result.Matches);
+        Assert.Equal("Тодор Василев", result.DidYouMean);
+    }
+
+    [Theory]
+    [InlineData("Гергана Петрова")]   // only the surname is close to "Иван Петров"
+    [InlineData("Зорница Кирова")]
+    [InlineData("Митко")]             // closest is only loosely similar
+    public void Match_OneWordFarOff_NoSuggestion(string query)
+    {
+        var result = NameMatcher.Match(query, Candidates);
+
+        Assert.Empty(result.Matches);
+        Assert.Null(result.DidYouMean);
+    }
+
+    [Fact]
+    public void Match_CandidateWordCountsOnlyOnce()
+    {
+        // "иван" and "иванов" must not both be scored against the same "Иван".
+        var result = NameMatcher.Match("Иван Иванов", Candidates);
+
+        Assert.DoesNotContain(result.Matches, m => m.Name == "Иван Петров");
+        Assert.DoesNotContain(result.Matches, m => m.Name == "Иван Петков");
+    }
+
+    [Fact]
     public void Match_SingleLetter_ReturnsNothing()
     {
         var result = NameMatcher.Match("и", Candidates);
