@@ -18,8 +18,7 @@ switch (command)
         return await ExtractCommand.RunAsync(config, root, Option("--protocols"));
 
     case "import":
-        Console.Error.WriteLine("'import' is not implemented yet.");
-        return 1;
+        return await ImportCommand.RunAsync(config, root);
 
     default:
         Console.Error.WriteLine("Usage: dotnet run --project Tracker.Importer -- extract [--protocols <file>] | import");
