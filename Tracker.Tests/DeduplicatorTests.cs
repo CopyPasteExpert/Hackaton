@@ -51,7 +51,7 @@ public class DeduplicatorTests
     [Fact]
     public void Deduplicate_NonOkRows_PassThroughUntouched()
     {
-        var rejected = Row("Георги Петров Колев", 42, 1, status: RowStatus.NameNotInPage);
+        var rejected = Row("Георги Петров Колев", 42, 1, status: RowStatus.NameFormat);
         var unread = Row("", null, null, status: RowStatus.PageNotRead, page: 5);
 
         var result = Deduplicator.Deduplicate([Row("Петър Иванов Колев", 42, 1), rejected, rejected, unread]);

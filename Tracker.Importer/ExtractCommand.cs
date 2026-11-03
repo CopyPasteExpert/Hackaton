@@ -5,7 +5,8 @@ using Tracker.Search;
 
 namespace Tracker.Importer;
 
-// `extract`: PDFs -> model -> validation -> import-review.csv. Never touches the database.
+// `extract`: PDFs -> tables by word position -> model names the columns ->
+// rows -> validation -> import-review.csv. Never touches the database.
 public static class ExtractCommand
 {
     public static async Task<int> RunAsync(IConfiguration config, string root, string? protocolsPath = null)
@@ -25,11 +26,11 @@ public static class ExtractCommand
         var downloader = new ProtocolDownloader(downloadHttp, Path.Combine(importerDir, "cache"));
 
         using var modelHttp = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
-        var extractor = new RowExtractor(modelHttp, ollama);
+        var mapper = new ColumnMapper(modelHttp, ollama);
 
         var watch = Stopwatch.StartNew();
         var rows = new List<ReviewRow>();
-        int downloaded = 0, cached = 0, skipped = 0, pagesRead = 0, pagesNotRead = 0;
+        int downloaded = 0, cached = 0, skipped = 0;
 
         foreach (var source in sources)
         {
@@ -47,11 +48,11 @@ public static class ExtractCommand
 
             if (wasCached) cached++; else downloaded++;
 
-            IReadOnlyList<PageText> pages;
+            List<Table> tables;
 
             try
             {
-                pages = PdfTextReader.Read(path);
+                tables = TableReader.Read(PdfWordReader.Read(path));
             }
             catch (Exception ex)
             {
@@ -60,61 +61,44 @@ public static class ExtractCommand
                 continue;
             }
 
-            foreach (var page in pages)
+            if (tables.Count == 0)
             {
-                ReviewRow Review(ValidatedRow r) => new(r.Status, r.Name, r.Grade, r.Score, r.Place,
-                    source.Competition, source.Year, source.Url, page.Number);
+                rows.Add(new ReviewRow(RowStatus.PageNotRead, "", null, null, null,
+                    source.Competition, source.Year, source.Url, 0));
+                Console.WriteLine("  no tables found");
+                continue;
+            }
 
-                if (string.IsNullOrWhiteSpace(page.Text))
+            // One model call per header; continuation pages reuse its mapping.
+            var maps = new Dictionary<int, ColumnMap?>();
+
+            foreach (var table in tables)
+            {
+                if (!maps.TryGetValue(table.HeaderId, out var map))
                 {
-                    pagesNotRead++;
-                    rows.Add(Review(new ValidatedRow("", null, null, null, RowStatus.PageNotRead)));
-                    Console.WriteLine($"  page {page.Number}/{pages.Count}: no text (scanned?)");
+                    map = await mapper.MapAsync(table);
+                    maps[table.HeaderId] = map;
+
+                    var described = map == null
+                        ? "could not map columns"
+                        : $"name=„{table.Columns[map.Name].Label}“, score=„{table.Columns[map.Score].Label}“" +
+                          (map.Place is { } p ? $", place=„{table.Columns[p].Label}“" : "") +
+                          (map.Grade is { } g ? $", grade=„{table.Columns[g].Label}“" : "");
+                    Console.WriteLine($"  table on page {table.Page}: {described}");
+                }
+
+                if (map == null)
+                {
+                    rows.Add(new ReviewRow(RowStatus.TableNotMapped, "", null, null, null,
+                        source.Competition, source.Year, source.Url, table.Page));
                     continue;
                 }
 
-                IReadOnlyList<ExtractedRow> extracted;
-
-                try
-                {
-                    extracted = await extractor.ExtractAsync(page.Text);
-                }
-                catch (Exception ex) when (ex is ExtractionFailedException or TaskCanceledException)
-                {
-                    pagesNotRead++;
-                    rows.Add(Review(new ValidatedRow("", null, null, null, RowStatus.PageNotRead)));
-                    Console.WriteLine($"  page {page.Number}/{pages.Count}: not read ({ex.Message})");
-                    continue;
-                }
-
-                var inOrder = RowValidator.IsRankingOrder(extracted);
-
-                if (!inOrder)
-                {
-                    // One retry that quotes the wrong numbers back to the model.
-                    var wrong = extracted.Where(r => r.Score.HasValue).Select(r => r.Score!.Value).ToList();
-                    Console.WriteLine($"  page {page.Number}/{pages.Count}: scores not in ranking order, retrying");
-
-                    try
-                    {
-                        extracted = await extractor.ExtractAsync(page.Text, wrong);
-                        inOrder = RowValidator.IsRankingOrder(extracted);
-                    }
-                    catch (Exception ex) when (ex is ExtractionFailedException or TaskCanceledException)
-                    {
-                        // Keep the first attempt; its rows are marked score-order below.
-                    }
-                }
-
-                pagesRead++;
-                var validated = extracted
-                    .Select(r => RowValidator.Validate(r, page, extracted))
-                    .Select(r => inOrder || r.Status != RowStatus.Ok ? r : r with { Status = RowStatus.ScoreOrder })
-                    .ToList();
-                rows.AddRange(validated.Select(Review));
-
-                Console.WriteLine($"  page {page.Number}/{pages.Count}: {validated.Count} rows, " +
-                    $"{validated.Count(r => r.Status == RowStatus.Ok)} ok");
+                var built = RowBuilder.Build(table, map);
+                rows.AddRange(built
+                    .Select(r => RowValidator.Validate(r, built))
+                    .Select(v => new ReviewRow(v.Status, v.Name, v.Grade, v.Score, v.Place,
+                        source.Competition, source.Year, source.Url, table.Page)));
             }
         }
 
@@ -123,11 +107,20 @@ public static class ExtractCommand
 
         Console.WriteLine();
         Console.WriteLine($"Protocols: {downloaded} downloaded, {cached} from cache, {skipped} skipped");
-        Console.WriteLine($"Pages: {pagesRead} read, {pagesNotRead} not read");
-        foreach (var group in final.GroupBy(r => r.Status).OrderBy(g => g.Key))
+
+        foreach (var group in final.GroupBy(r => r.Competition))
         {
-            Console.WriteLine($"Rows {group.Key}: {group.Count()}");
+            var ok = group.Count(r => r.Status == RowStatus.Ok);
+            var rejected = group.Count(r => r.Status != RowStatus.Ok);
+            var share = ok + rejected == 0 ? 0 : 100.0 * rejected / (ok + rejected);
+            Console.WriteLine($"{group.Key}: ok {ok}, rejected {rejected} ({share:0}%)");
         }
+
+        foreach (var group in final.Where(r => r.Status != RowStatus.Ok).GroupBy(r => r.Status))
+        {
+            Console.WriteLine($"Rejected {group.Key}: {group.Count()}");
+        }
+
         Console.WriteLine($"Time: {watch.Elapsed:mm\\:ss}");
         Console.WriteLine($"Review: {reviewPath}");
 
