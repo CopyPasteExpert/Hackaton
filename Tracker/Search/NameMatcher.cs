@@ -14,6 +14,10 @@ public static class NameMatcher
     // a shared "-ова" ending alone must not produce "Имахте предвид…?".
     public const double SuggestMinWordSimilarity = 0.75;
 
+    // A match needs every query word to be close, not just a good average: an
+    // exact first name plus a surname sharing only "-ова" is another student.
+    public const double MatchMinWordSimilarity = 0.85;
+
     // Query words shorter than this carry too little signal ("и", "a").
     private const int MinWordLength = 2;
 
@@ -41,7 +45,7 @@ public static class NameMatcher
             .ToList();
 
         var matches = scored
-            .Where(s => s.Match.Score >= MatchThreshold)
+            .Where(s => s.Match.Score >= MatchThreshold && s.Weakest >= MatchMinWordSimilarity)
             .Select(s => s.Match)
             .ToList();
 

@@ -103,6 +103,18 @@ public class NameMatcherTests
     }
 
     [Fact]
+    public void Match_SameFirstNameOtherSurname_NotAMatch()
+    {
+        // Real data: "Кирова" and "Петрова" share only the "-ова" ending; the
+        // exact first name must not carry them over the match threshold.
+        string[] candidates = [.. Candidates, "Зорница Цветанова Петрова"];
+
+        var result = NameMatcher.Match("Зорница Кирова", candidates);
+
+        Assert.Empty(result.Matches);
+    }
+
+    [Fact]
     public void Match_CandidateWordCountsOnlyOnce()
     {
         // "иван" and "иванов" must not both be scored against the same "Иван".
