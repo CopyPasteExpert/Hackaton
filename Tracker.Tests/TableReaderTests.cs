@@ -181,6 +181,22 @@ public class TableReaderTests
     }
 
     [Fact]
+    public void Read_SchoolRightAfterName_SplitAtSharedColumnStart()
+    {
+        // Math p.5: the school starts at the same x (@200) in every row, and in
+        // the first row only 3 pt after the surname.
+        var page = Page(
+            [W("№", 50, 510), W("Имена", 100, 510), W("Училище", 200, 510), W("Общо", 700, 510)],
+            [W("1", 50, 495), W("Ивелин", 88, 495), W("Ивайлов", 121, 495), W("Вълканов", 157, 495), W("СМГ", 200, 495), W("15,0", 700, 495)],
+            [W("2", 50, 480), W("Анна", 88, 480), W("Иванова", 111, 480), W("СУ", 200, 480), W("14,0", 700, 480)],
+            [W("3", 50, 465), W("Мария", 88, 465), W("Петрова", 116, 465), W("ПМГ", 200, 465), W("12,0", 700, 465)]);
+
+        var table = Assert.Single(TableReader.Read([page]));
+
+        Assert.Equal(["1", "Ивелин Ивайлов Вълканов", "СМГ", "15,0"], table.Rows[0].Values);
+    }
+
+    [Fact]
     public void Read_PageWithoutTable_NoTable()
     {
         var page = Page(

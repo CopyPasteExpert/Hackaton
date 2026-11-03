@@ -198,7 +198,7 @@ public static partial class TableReader
     // printed on its own line), split into cells.
     private static List<List<Cell>> BuildRows(List<Line> lines, List<Line> anchors)
     {
-        var rows = anchors.ToDictionary(a => a, a => ToCells(a));
+        var rowLines = anchors.ToDictionary(a => a, a => new List<Line> { a });
 
         foreach (var line in lines.Except(anchors))
         {
@@ -206,23 +206,50 @@ public static partial class TableReader
 
             if (Math.Abs(nearest.Y - line.Y) <= JoinDistance)
             {
-                rows[nearest].AddRange(ToCells(line));
+                rowLines[nearest].Add(line);
             }
         }
 
-        return anchors.Select(a => rows[a]).ToList();
+        var starts = ColumnStarts(anchors.Select(a => rowLines[a]).ToList());
+
+        return anchors.Select(a => rowLines[a].SelectMany(l => ToCells(l, starts)).ToList()).ToList();
     }
 
-    // Neighbouring words form one cell, but a word with a digit never joins
-    // another: the grade sits ~4 pt left of the first name, and informatics
-    // logins ("A203") end ~2 pt before it. Names never contain digits.
-    private static List<Cell> ToCells(Line line)
+    // x positions where a word starts in most rows: column starts. A school that
+    // begins 3 pt after a long surname still begins at the same x as the schools
+    // of all other rows, while the ends of names vary.
+    private static List<double> ColumnStarts(List<List<Line>> rows)
+    {
+        const int MinRows = 3;
+        const double Share = 0.6;
+
+        if (rows.Count < MinRows)
+        {
+            return [];
+        }
+
+        return rows
+            .SelectMany(row => row.SelectMany(l => l.Words).Select(w => Math.Round(w.Left / 2) * 2).Distinct())
+            .GroupBy(x => x)
+            .Where(g => g.Count() >= Share * rows.Count)
+            .Select(g => g.Key)
+            .ToList();
+    }
+
+    // Neighbouring words form one cell, except: a word with a digit never joins
+    // another (the grade sits ~4 pt left of the first name, informatics logins
+    // end ~2 pt before it; names never contain digits), and a word at a column
+    // start begins a new cell.
+    private static List<Cell> ToCells(Line line, IReadOnlyList<double>? columnStarts = null)
     {
         var cells = new List<Cell>();
 
         foreach (var word in line.Words)
         {
+            var atColumnStart = columnStarts?.Any(x => Math.Abs(word.Left - x) <= 2) ?? false;
+
             if (cells.Count > 0
+                && !atColumnStart
                 && word.Left - cells[^1].Right <= WordGap
                 && !word.Text.Any(char.IsDigit)
                 && !cells[^1].Text.Any(char.IsDigit))
