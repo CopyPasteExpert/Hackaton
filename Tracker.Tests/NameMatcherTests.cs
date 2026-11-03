@@ -135,6 +135,16 @@ public class NameMatcherTests
         Assert.Equal("Иван Петров Колев", result.Matches[0].Name);
     }
 
+    [Theory]
+    [InlineData("Ана Неда Караджова", "Ана-Неда Георгиева Караджова")]
+    [InlineData("Асен Христов", "Йоан-Асен Владимиров Христов")]
+    public void Match_HyphenatedFirstNameTypedWithSpace_Found(string query, string name)
+    {
+        var result = NameMatcher.Match(query, [.. Candidates, name]);
+
+        Assert.Equal(name, result.Matches[0].Name);
+    }
+
     [Fact]
     public void Match_CandidateWordCountsOnlyOnce()
     {

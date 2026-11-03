@@ -25,7 +25,7 @@ public class ProtocolDownloader(HttpClient http, string cacheDir)
             await File.WriteAllBytesAsync(path, bytes, ct);
             return path;
         }
-        catch (HttpRequestException ex)
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException && !ct.IsCancellationRequested)
         {
             Console.Error.WriteLine($"  Download failed: {ex.Message}");
             return null;

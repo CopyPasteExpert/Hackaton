@@ -37,6 +37,19 @@ public class DeduplicatorTests
     }
 
     [Fact]
+    public void Deduplicate_SameNameDifferentGrade_KeepsBoth()
+    {
+        // Two different students with the same name in different groups.
+        var result = Deduplicator.Deduplicate(
+        [
+            Row("Иван Стоянов Иванов", 30, null) with { Grade = 9 },
+            Row("Иван Стоянов Иванов", 25, null) with { Grade = 12 }
+        ]);
+
+        Assert.Equal(2, result.Count);
+    }
+
+    [Fact]
     public void Deduplicate_SameNameDifferentCompetition_KeepsBoth()
     {
         var result = Deduplicator.Deduplicate(

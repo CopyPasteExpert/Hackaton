@@ -110,6 +110,39 @@ public class ColumnMapperTests
         Assert.Equal(4, map!.Score);
     }
 
+    private sealed class SlowHandler : HttpMessageHandler
+    {
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            await Task.Delay(TimeSpan.FromSeconds(10), cancellationToken);
+            return new HttpResponseMessage(HttpStatusCode.OK);
+        }
+    }
+
+    [Fact]
+    public async Task Map_ModelTimesOut_ReturnsNullInsteadOfCrashing()
+    {
+        var mapper = new ColumnMapper(
+            new HttpClient(new SlowHandler()) { Timeout = TimeSpan.FromMilliseconds(100) },
+            new OllamaOptions { Url = "http://localhost:11434", Model = "test-model" });
+
+        Assert.Null(await mapper.MapAsync(Sample));
+    }
+
+    [Fact]
+    public async Task Download_ServerTimesOut_ReturnsNullInsteadOfCrashing()
+    {
+        var cache = Path.Combine(Path.GetTempPath(), $"cache-{Guid.NewGuid():N}");
+        var downloader = new ProtocolDownloader(
+            new HttpClient(new SlowHandler()) { Timeout = TimeSpan.FromMilliseconds(100) }, cache);
+
+        var path = await downloader.GetAsync(
+            new ProtocolSource("https://example.test/a.pdf", "Олимпиада", 2026), CancellationToken.None);
+
+        Assert.Null(path);
+    }
+
     [Fact]
     public async Task Map_PromptHasLabelsAndSampleRows()
     {

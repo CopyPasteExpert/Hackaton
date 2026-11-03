@@ -280,6 +280,26 @@ public class TableReaderTests
     }
 
     [Fact]
+    public void Read_ContinuationRowsBeforeNewHeader_Kept()
+    {
+        // Informatics p.2: the previous table continues at the top of the page,
+        // then the next group's header starts a new table.
+        var second = Page(
+            Row("4", "12", "Георги", "Петров", "Колев", "СУ", "29", 560),
+            Row("5", "9", "Елена", "Тодорова", "Иванова", "ПМГ", "28", 545),
+            Header(500),
+            Row("1", "11", "Борис", "Георгиев", "Марков", "СУ", "40", 485));
+
+        var tables = TableReader.Read([FirstPage(), second]);
+
+        Assert.Equal(3, tables.Count);
+        Assert.Equal(tables[0].HeaderId, tables[1].HeaderId);
+        Assert.Equal(["4", "5"], tables[1].Rows.Select(r => r.Values[0]));
+        Assert.NotEqual(tables[0].HeaderId, tables[2].HeaderId);
+        Assert.Equal("Борис Георгиев Марков", tables[2].Rows[0].Values[2]);
+    }
+
+    [Fact]
     public void Read_PageWithoutTable_NoTable()
     {
         var page = Page(

@@ -89,6 +89,18 @@ public class SearchServiceTests
         Assert.Null(result.DidYouMean);
     }
 
+    [Theory]
+    [InlineData("казвам се Мария Иванова")]
+    [InlineData("аз съм Мария Иванова")]
+    [InlineData("здравей, търся Мария Иванова")]
+    public void Combine_SentenceWithoutModel_FindsName(string query)
+    {
+        // Ollama down or slow: common words around the name must not hide it.
+        var result = SearchService.Combine(query, new InterpretedQuery([query], false), Candidates);
+
+        Assert.Equal("Мария Иванова", result.Matches[0].Name);
+    }
+
     [Fact]
     public void Combine_AiNotUsed_IgnoresInterpretedNames()
     {

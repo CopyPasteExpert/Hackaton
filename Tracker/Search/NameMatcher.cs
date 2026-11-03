@@ -24,7 +24,7 @@ public static class NameMatcher
     public static MatchResult Match(string query, IEnumerable<string> candidates)
     {
         var queryWords = NameNormalizer.Normalize(query)
-            .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .Split([' ', '-'], StringSplitOptions.RemoveEmptyEntries)
             .Where(w => w.Length >= MinWordLength)
             .ToArray();
 
@@ -76,7 +76,7 @@ public static class NameMatcher
     private static (double Average, double Weakest) Score(string[] queryWords, string candidate)
     {
         var candidateWords = NameNormalizer.Normalize(candidate)
-            .Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            .Split([' ', '-'], StringSplitOptions.RemoveEmptyEntries);
 
         if (candidateWords.Length == 0)
         {

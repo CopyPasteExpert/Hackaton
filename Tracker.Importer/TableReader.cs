@@ -43,12 +43,15 @@ public static partial class TableReader
 
             foreach (var segment in segments)
             {
-                // A page without any header continues the last table. On a page
-                // with headers, text before the first one (titles, laureates
-                // written as sentences) is not part of a table.
+                // Rows before the first header on a page continue the last
+                // table (informatics: a group ends at the top of the page, the
+                // next group's header follows). For an unranked table that is
+                // only safe on a page without headers: above a header on such a
+                // page sit titles and laureates written as sentences, and rows
+                // without rank numbers cannot be told apart from them.
                 var isContinuation = segment.Header.Count == 0;
 
-                if (isContinuation && (last == null || segments.Count > 1))
+                if (isContinuation && (last == null || (segments.Count > 1 && !last.Value.Ranked)))
                 {
                     continue;
                 }

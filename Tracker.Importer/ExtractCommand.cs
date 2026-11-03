@@ -89,8 +89,9 @@ public static class ExtractCommand
 
                 if (map == null)
                 {
-                    rows.Add(new ReviewRow(RowStatus.TableNotMapped, "", null, null, null,
-                        source.Competition, source.Year, source.Url, table.Page));
+                    // One row per student, so the loss summary counts them.
+                    rows.AddRange(table.Rows.Select(_ => new ReviewRow(RowStatus.TableNotMapped, "", null, null, null,
+                        source.Competition, source.Year, source.Url, table.Page)));
                     continue;
                 }
 

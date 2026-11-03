@@ -47,7 +47,8 @@ public class ColumnMapper(HttpClient http, OllamaOptions options)
                 answer = await AskAsync(correction + Instructions + Describe(table), ct);
             }
             catch (Exception ex) when (ex is HttpRequestException or JsonException or KeyNotFoundException
-                                           or InvalidOperationException && !ct.IsCancellationRequested)
+                                           or InvalidOperationException or TaskCanceledException
+                                       && !ct.IsCancellationRequested)
             {
                 LastProblem = $"no valid answer from the model ({ex.Message})";
                 continue;

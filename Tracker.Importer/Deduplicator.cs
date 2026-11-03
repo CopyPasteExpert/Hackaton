@@ -11,7 +11,7 @@ public static class Deduplicator
     public static List<ReviewRow> Deduplicate(IEnumerable<ReviewRow> rows)
     {
         var result = new List<ReviewRow>();
-        var okIndex = new Dictionary<(string, string, int), int>();
+        var okIndex = new Dictionary<(string, string, int), List<int>>();
 
         foreach (var row in rows)
         {
@@ -23,9 +23,18 @@ public static class Deduplicator
 
             var key = (NameNormalizer.Normalize(row.Name), row.Competition, row.Year);
 
-            if (!okIndex.TryGetValue(key, out var index))
+            if (!okIndex.TryGetValue(key, out var indexes))
             {
-                okIndex[key] = result.Count;
+                okIndex[key] = indexes = [];
+            }
+
+            // Same name in another grade is another student.
+            var same = indexes.Cast<int?>().FirstOrDefault(i =>
+                result[i!.Value].Grade == null || row.Grade == null || result[i.Value].Grade == row.Grade);
+
+            if (same is not { } index)
+            {
+                indexes.Add(result.Count);
                 result.Add(row);
             }
             else if (IsBetter(row, result[index]))

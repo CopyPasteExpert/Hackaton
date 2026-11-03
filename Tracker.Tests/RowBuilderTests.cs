@@ -40,6 +40,24 @@ public class RowBuilderTests
     }
 
     [Fact]
+    public void Build_LatinLookalikeInCyrillicName_Converted()
+    {
+        // Physics p.3 prints "Пeшев" with a Latin "e".
+        var row = Assert.Single(RowBuilder.Build(TableWith(["Тодор Анатолиев Пeшев", "11", "18,00", ""]), Map));
+
+        Assert.Equal("Тодор Анатолиев Пешев", row.Name);
+    }
+
+    [Fact]
+    public void Build_NameWithFootnote_CutAtStar()
+    {
+        var row = Assert.Single(RowBuilder.Build(
+            TableWith(["Хрисияна Илиева Койнова * съгласно т. 4.17. от регламента", "11", "45", ""]), Map));
+
+        Assert.Equal("Хрисияна Илиева Койнова", row.Name);
+    }
+
+    [Fact]
     public void Build_NoGradeColumn_NullGrade()
     {
         var row = Assert.Single(RowBuilder.Build(
