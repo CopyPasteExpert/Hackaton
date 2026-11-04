@@ -22,7 +22,7 @@ public static class RowBuilder
         table.Rows
             .Select(row => new ExtractedRow(
                 CleanName(row.Values[map.Name]),
-                map.Grade is { } g && int.TryParse(row.Values[g].Trim().TrimEnd('.'), out var grade) ? grade : null,
+                map.Grade is { } g ? Grade(row.Values[g]) : null,
                 ProtocolNumber.Parse(row.Values[map.Score]),
                 map.Place is { } p ? Place(row.Values[p]) : null))
             .ToList();
@@ -39,6 +39,23 @@ public static class RowBuilder
             .Select(word => word.Any(c => c is >= 'А' and <= 'я')
                 ? new string(word.Select(c => LatinLookalikes.GetValueOrDefault(c, c)).ToArray())
                 : word));
+    }
+
+    private static readonly string[] RomanGrades =
+        ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII"];
+
+    // "11", "11." or Roman "XI" (chemistry writes grades in Roman numerals).
+    private static int? Grade(string text)
+    {
+        var value = text.Trim().TrimEnd('.');
+
+        if (int.TryParse(value, out var grade))
+        {
+            return grade;
+        }
+
+        var roman = Array.IndexOf(RomanGrades, value.ToUpperInvariant());
+        return roman >= 0 ? roman + 1 : null;
     }
 
     // "1", "1." or "първо място".

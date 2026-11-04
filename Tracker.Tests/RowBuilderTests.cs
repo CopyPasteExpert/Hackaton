@@ -57,6 +57,20 @@ public class RowBuilderTests
         Assert.Equal("Хрисияна Илиева Койнова", row.Name);
     }
 
+    [Theory]
+    [InlineData("VIII", 8)]
+    [InlineData("XI", 11)]
+    [InlineData("IV", 4)]
+    [InlineData("XII", 12)]
+    [InlineData("10", 10)]
+    [InlineData("11.", 11)]
+    public void Build_GradeArabicOrRoman(string grade, int expected)
+    {
+        var row = Assert.Single(RowBuilder.Build(TableWith(["Петър Иванов Колев", grade, "42", ""]), Map));
+
+        Assert.Equal(expected, row.Grade);
+    }
+
     [Fact]
     public void Build_NoGradeColumn_NullGrade()
     {

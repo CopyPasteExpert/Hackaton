@@ -144,6 +144,29 @@ public class ColumnMapperTests
     }
 
     [Fact]
+    public async Task Map_AnswerIsASampleValue_UsesItsColumn()
+    {
+        // Physics p.3: the names column has no header ("Колона 3"), and the model
+        // answers with a student's name from the sample rows instead of the label.
+        var handler = new QueueHandler("""{"name":"Петър Иванов Колев","grade":"Клас","score":"Общ бр. точки","place":null}""");
+
+        var map = await Create(handler).MapAsync(Sample);
+
+        Assert.Equal(2, map!.Name);
+    }
+
+    [Fact]
+    public async Task Map_AnswerIsASampleNumber_UsesItsColumn()
+    {
+        // Physics p.3: the model answers "25.00" for a total printed as "25,00".
+        var handler = new QueueHandler("""{"name":"Имена","grade":"Клас","score":"42.00","place":null}""");
+
+        var map = await Create(handler).MapAsync(Sample);
+
+        Assert.Equal(4, map!.Score);
+    }
+
+    [Fact]
     public async Task Map_PromptHasLabelsAndSampleRows()
     {
         var handler = new QueueHandler(Correct);

@@ -21,7 +21,10 @@ public class SearchService(QueryInterpreter interpreter, IConfiguration configur
 
     public async Task<SearchResponse> SearchAsync(string q, CancellationToken ct = default)
     {
-        var interpreted = await interpreter.InterpretAsync(q, ct);
+        // A full name needs no model, and the model would only shorten it.
+        var interpreted = IsFullName(q)
+            ? new InterpretedQuery([q], false)
+            : await interpreter.InterpretAsync(q, ct);
 
         await using var connection = new MySqlConnection(
             configuration.GetConnectionString("Tracker"));
@@ -62,9 +65,14 @@ public class SearchService(QueryInterpreter interpreter, IConfiguration configur
 
         var (baseline, baselineDidYouMean) = MatchAll(readings, candidates);
 
+        // A full name (three or more name words, nothing else) is not given to
+        // the model: it drops the middle name, and two names then fit another
+        // student ("Петър Иванов Петров" → "Петър Петров Овчаров").
+        var useModel = interpreted.AiUsed && !IsFullName(query);
+
         // The model's suggestion is dropped: it would be built from a name the
         // model may have made up, not from what the user typed.
-        var (ai, _) = interpreted.AiUsed
+        var (ai, _) = useModel
             ? MatchAll(interpreted.Names, candidates)
             : ([], null);
 
@@ -81,13 +89,20 @@ public class SearchService(QueryInterpreter interpreter, IConfiguration configur
             return new CombinedMatch([], baselineDidYouMean, false, null);
         }
 
+        // An exact match hides near ones ("Иван Петров" does not also list
+        // "Иван Петков"); without one, close matches all stay.
+        if (matches[0].Score >= ExactScore)
+        {
+            matches = matches.Where(m => m.Score >= ExactScore).ToList();
+        }
+
         var baselineTop = baseline
             .OrderByDescending(kv => kv.Value)
             .ThenBy(kv => kv.Key, StringComparer.Ordinal)
             .Select(kv => kv.Key)
             .FirstOrDefault();
 
-        var aiChangedOutcome = interpreted.AiUsed && baselineTop != matches[0].Name;
+        var aiChangedOutcome = useModel && baselineTop != matches[0].Name;
 
         return aiChangedOutcome
             ? new CombinedMatch(matches, null, true, $"Разбрах „{query}“ като „{matches[0].Name}“")
@@ -101,6 +116,19 @@ public class SearchService(QueryInterpreter interpreter, IConfiguration configur
         "аз", "съм", "казвам", "се", "името", "ми", "е", "моето", "търся", "покажи",
         "резултатите", "резултати", "на", "за", "здравей", "здрасти", "моля", "постиженията"
     ];
+
+    private const double ExactScore = 0.999;
+
+    // Exactly three words and none of them a filler word: what someone types as
+    // their full name. A longer query ("колко точки има Гергана Рандева") is a
+    // question, which the model may still read.
+    public static bool IsFullName(string query)
+    {
+        var normalized = NameNormalizer.Normalize(query);
+
+        return StripFillerWords(query) == normalized
+               && normalized.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length == 3;
+    }
 
     private static string StripFillerWords(string query) =>
         string.Join(' ', NameNormalizer.Normalize(query)

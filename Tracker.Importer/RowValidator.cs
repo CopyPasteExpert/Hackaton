@@ -28,17 +28,6 @@ public static partial class RowValidator
         return new(name, grade, score, CheckPlace(row.Place, score, tableRows), RowStatus.Ok);
     }
 
-    // Protocols are rankings, so totals go down the page. One rise is allowed
-    // where a second table starts on the same page. More rises mean the numbers
-    // are not totals (a work's fictitious number looks like a plausible score).
-    public static bool IsRankingOrder(IReadOnlyList<ExtractedRow> rows)
-    {
-        var scores = rows.Where(r => r.Score.HasValue).Select(r => r.Score!.Value).ToList();
-        var rises = scores.Zip(scores.Skip(1)).Count(pair => pair.Second > pair.First);
-
-        return rises <= 1;
-    }
-
     // A place is a whole number and cannot be better than the number of students
     // in the table who scored more. This catches a mark (5,75 or 6) read as a place.
     private static int? CheckPlace(decimal? place, decimal score, IReadOnlyList<ExtractedRow> tableRows)

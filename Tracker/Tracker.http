@@ -1,6 +1,6 @@
 @Tracker_HostAddress = http://localhost:5011
 
-GET {{Tracker_HostAddress}}/weatherforecast/
+GET {{Tracker_HostAddress}}/api/search?q=Aleksandar%20Bangachev
 Accept: application/json
 
 ###

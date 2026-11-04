@@ -101,6 +101,51 @@ public class SearchServiceTests
         Assert.Equal("Мария Иванова", result.Matches[0].Name);
     }
 
+    [Theory]
+    [InlineData("Петър Иванов Петров", "Петър Петров", "Петър Петров Овчаров")]
+    [InlineData("Иван Иванов Иванов", "Иван Иванов", "Иван Танев Иванов")]
+    public void Combine_ThreeNamesNotInDatabase_ModelCannotShortenToSomeoneElse(
+        string query, string modelReading, string otherStudent)
+    {
+        // The model drops the middle name; two names then fit another student.
+        string[] candidates = [.. Candidates, otherStudent];
+
+        var result = SearchService.Combine(query, new InterpretedQuery([modelReading], true), candidates);
+
+        Assert.Empty(result.Matches);
+        Assert.False(result.AiUsed);
+    }
+
+    [Theory]
+    [InlineData("Гергана Миленова Рандева", true)]
+    [InlineData("гергана миленова рандева", true)]
+    [InlineData("Ана-Неда Георгиева Караджова", true)]
+    [InlineData("колко точки има Гергана Рандева", false)]
+    [InlineData("Кирил Зашев от десети клас", false)]
+    [InlineData("аз съм Гергана Рандева", false)]
+    [InlineData("Гергана Рандева", false)]
+    public void IsFullName_OnlyThreeNameWords(string query, bool expected)
+    {
+        Assert.Equal(expected, SearchService.IsFullName(query));
+    }
+
+    [Fact]
+    public void Combine_ExactMatch_HidesPartialOnes()
+    {
+        var result = SearchService.Combine("Иван Петров", new InterpretedQuery(["Иван Петров"], false), Candidates);
+
+        Assert.Equal(["Иван Петров"], result.Matches.Select(m => m.Name));
+    }
+
+    [Fact]
+    public void Combine_NoExactMatch_KeepsCloseOnes()
+    {
+        var result = SearchService.Combine("Иван Петорв", new InterpretedQuery(["Иван Петорв"], false), Candidates);
+
+        Assert.Equal("Иван Петров", result.Matches[0].Name);
+        Assert.Contains(result.Matches, m => m.Name == "Иван Петков");
+    }
+
     [Fact]
     public void Combine_AiNotUsed_IgnoresInterpretedNames()
     {

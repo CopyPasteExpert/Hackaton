@@ -145,7 +145,21 @@ public class ColumnMapper(HttpClient http, OllamaOptions options)
                                 || x.c.Label.Contains(label, StringComparison.OrdinalIgnoreCase)))
                 .ToList();
 
-            return partial.Count == 1 ? partial[0].i : null;
+            if (partial.Count == 1)
+            {
+                return partial[0].i;
+            }
+
+            // A column without a header ("Колона 3"): the model sometimes answers
+            // with a value from the sample rows (a student's name) instead.
+            // Numbers are compared as numbers: "25.00" is the printed "25,00".
+            var number = ProtocolNumber.Parse(label);
+            var byValue = table.Columns.Select((_, i) => i)
+                .Where(i => table.Rows.Take(SampleRows).Any(r =>
+                    r.Values[i] == label || (number != null && ProtocolNumber.Parse(r.Values[i]) == number)))
+                .ToList();
+
+            return byValue.Count == 1 ? byValue[0] : null;
         }
 
         var name = Index(answer.Name);

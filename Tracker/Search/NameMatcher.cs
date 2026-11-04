@@ -103,15 +103,25 @@ public static class NameMatcher
             best[pair.Query] = pair.Similarity;
         }
 
-        var unpaired = queryUsed.Count(used => !used);
+        var full = (best.Average(), best.Min());
 
-        if (unpaired == 1 && queryWords.Length >= 3 && candidateWords.Length >= 2)
+        if (queryWords.Length != 3 || candidateWords.Length != 2)
         {
-            var paired = best.Where((_, i) => queryUsed[i]).ToArray();
-            return (paired.Average() * MissingMiddleNamePenalty, paired.Min());
+            return full;
         }
 
-        return (best.Average(), best.Min());
+        // Only the middle name may be missing: first pairs with first, last
+        // with last. "Петър Иванов Петров" must not fit "Иван Петров" by
+        // pairing "Иванов" with "Иван" and dropping "Петър".
+        double[] firstAndLast =
+        [
+            JaroWinkler(queryWords[0], candidateWords[0]),
+            JaroWinkler(queryWords[2], candidateWords[1])
+        ];
+
+        var withoutMiddle = (firstAndLast.Average() * MissingMiddleNamePenalty, firstAndLast.Min());
+
+        return withoutMiddle.Item1 > full.Item1 ? withoutMiddle : full;
     }
 
     public static double JaroWinkler(string a, string b)
