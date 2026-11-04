@@ -291,9 +291,12 @@ button, input { font: inherit; color: inherit; }
 .card-head {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 14px;
     margin-bottom: 16px;
 }
+
+.save-all { flex: none; white-space: nowrap; }
 
 .avatar {
     flex: none;
@@ -306,7 +309,7 @@ button, input { font: inherit; color: inherit; }
     font-weight: 800;
 }
 
-.card-title { flex: 1; min-width: 0; }
+.card-title { flex: 1; min-width: 180px; }
 
 .card-title h3 { font-size: 1.25rem; }
 

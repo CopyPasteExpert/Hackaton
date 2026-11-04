@@ -162,8 +162,15 @@ function studentCard(student) {
     head.append(el("span", "match",
         `${Math.round(student.matchScore * 100)}% съвпадение`));
 
+    const rowButtons = student.results.map(r => saveButton(r.id));
+
+    const saveAll = el("button", "button primary small save-all", "Запази всички");
+    saveAll.type = "button";
+    saveAll.addEventListener("click", () => saveAllResults(student.results, rowButtons, saveAll));
+    head.append(saveAll);
+
     const rows = el("div", "rows");
-    rows.append(...student.results.map(r => resultRow(r, saveButton(r.id))));
+    rows.append(...student.results.map((r, i) => resultRow(r, rowButtons[i])));
 
     card.append(head, rows);
     return card;
@@ -371,6 +378,48 @@ async function saveResult(resultId, button) {
         button.disabled = false;
         toast("Не успяхме да запазим резултата.");
     }
+}
+
+// Saves every result of one student, one request each (the API saves one
+// result at a time). Already saved ones count as done.
+async function saveAllResults(results, rowButtons, button) {
+    if (!loggedIn) {
+        showTab("login");
+        setMessage("loginMessage", "Влез, за да запазваш резултати.");
+        dialog.showModal();
+        return;
+    }
+
+    button.disabled = true;
+    rowButtons.forEach(b => b.disabled = true);
+
+    let saved = 0;
+    let failed = 0;
+
+    for (const [i, result] of results.entries()) {
+        const response = await fetch(`/api/saved-results/${result.id}`, {
+            method: "POST",
+            credentials: "include"
+        });
+
+        if (response.ok || response.status === 409) {
+            if (response.ok) saved++;
+            rowButtons[i].textContent = "Запазено ✓";
+        } else {
+            failed++;
+            rowButtons[i].disabled = false;
+        }
+    }
+
+    if (failed > 0) {
+        button.disabled = false;
+        toast(`Не успяхме да запазим ${failed} от резултатите.`);
+    } else {
+        button.textContent = "Запазено ✓";
+        toast(saved > 0 ? `Добавени в библиотеката: ${saved}.` : "Всичко вече е в библиотеката ти.");
+    }
+
+    loadLibrary();
 }
 
 async function loadLibrary() {
