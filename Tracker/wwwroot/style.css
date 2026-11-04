@@ -331,9 +331,9 @@ button, input { font: inherit; color: inherit; }
 
 .row {
     display: grid;
-    grid-template-columns: auto 1fr auto auto;
+    grid-template-columns: auto minmax(0, 1fr) auto auto auto;
     align-items: center;
-    gap: 12px;
+    gap: 14px;
     padding: 10px 12px;
     background: var(--surface-2);
     border-radius: 12px;
@@ -350,15 +350,57 @@ button, input { font: inherit; color: inherit; }
 
 .row-text { min-width: 0; }
 
-.row-title { font-weight: 600; }
+.row-title { font-weight: 700; }
 
 .row-sub { color: var(--muted); font-size: .85rem; }
 
-.row-details .place { color: var(--gold); font-weight: 700; }
+.row-details { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
 
-.row-details .source { color: var(--accent); text-underline-offset: 2px; }
+.row-details .source {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--accent);
+    font-weight: 600;
+    text-decoration: none;
+}
 
-.score { font-weight: 800; font-variant-numeric: tabular-nums; }
+.row-details .source:hover { text-decoration: underline; text-underline-offset: 2px; }
+
+/* Places 1–3: medals; dark text on light fills reads in both themes. */
+.medal {
+    font-size: .85rem;
+    font-weight: 800;
+    border-radius: 999px;
+    padding: 4px 12px;
+    white-space: nowrap;
+}
+
+.medal-1 { background: #f6d46b; color: #5c3d00; }
+.medal-2 { background: #dfe3ea; color: #343b48; }
+.medal-3 { background: #f0c7a0; color: #5e3210; }
+
+.place-plain { font-size: .85rem; font-weight: 700; color: var(--muted); white-space: nowrap; }
+
+.score { font-weight: 800; font-size: 1.05rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.icon-button.save {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface);
+    color: var(--accent);
+}
+
+.icon-button.save:hover { border-color: var(--accent); background: var(--surface); }
+
+.icon-button.save.saved { background: var(--accent); border-color: var(--accent); color: var(--accent-text); cursor: default; }
+
+.icon-button.save.saved svg { fill: currentColor; }
 
 .score.none { font-weight: 500; color: var(--muted); font-size: .85rem; }
 
@@ -476,15 +518,32 @@ button, input { font: inherit; color: inherit; }
 /* Phones */
 
 @media (max-width: 600px) {
-    .hero { padding-top: 24px; }
+    .hero { padding: 16px 0 12px; text-align: left; }
+
+    .hero h1 { font-size: 1.75rem; }
+
+    .lead { margin: 8px 0 16px; font-size: .95rem; }
+
+    .examples { justify-content: flex-start; }
 
     .account-status { display: none; }
 
-    .search { flex-direction: column; border-radius: 16px; }
+    .search { border-radius: 16px; padding: 6px; }
 
-    .row { grid-template-columns: auto 1fr auto; }
+    .search input { font-size: 1rem; padding: 8px 10px; }
 
-    .row .button { grid-column: 1 / -1; }
+    /* Competition and points on top; year, place and the button below. */
+    .row {
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        grid-template-areas: "title title score" "year place action";
+        gap: 8px 10px;
+    }
+
+    .row > .row-text { grid-area: title; }
+    .row > .score { grid-area: score; align-self: start; }
+    .row > .year { grid-area: year; }
+    .row > .medal, .row > .place-plain, .row > .place-empty { grid-area: place; justify-self: start; }
+    .row > .icon-button, .row > .button { grid-area: action; }
 
     .advanced-form { grid-template-columns: 1fr; }
 }

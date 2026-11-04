@@ -35,7 +35,39 @@ function competitionsLabel(count) {
     return count === 1 ? "1 състезание" : `${count} състезания`;
 }
 
-// One competition result as a row. `action` is an optional button.
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+// A small stroke icon from one path, hidden from screen readers.
+function icon(pathData, size = 16) {
+    const svg = document.createElementNS(SVG_NS, "svg");
+    svg.setAttribute("width", size);
+    svg.setAttribute("height", size);
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("fill", "none");
+    svg.setAttribute("stroke", "currentColor");
+    svg.setAttribute("stroke-width", "2");
+    svg.setAttribute("stroke-linecap", "round");
+    svg.setAttribute("stroke-linejoin", "round");
+    svg.setAttribute("aria-hidden", "true");
+    const path = document.createElementNS(SVG_NS, "path");
+    path.setAttribute("d", pathData);
+    svg.append(path);
+    return svg;
+}
+
+const BOOKMARK = "M6 3h12v18l-6-4-6 4z";
+const ARROW_OUT = "M7 17 17 7M9 7h8v8";
+
+// Places 1–3 get a medal; others a plain label; no place, nothing.
+function placeBadge(place) {
+    if (!place) return el("span", "place-empty");
+    return place <= 3
+        ? el("span", `medal medal-${place}`, `${place} място`)
+        : el("span", "place-plain", `${place} място`);
+}
+
+// One competition result as a row: year · competition (with grade and a link
+// to the MON protocol) · place · points · an optional action button.
 function resultRow(result, action) {
     const row = el("div", "row");
 
@@ -47,33 +79,25 @@ function resultRow(result, action) {
         text.append(el("div", "row-sub", result.participant));
     }
 
-    // "1 място · 11 клас · Протокол (МОН)", with only the parts we have.
-    const details = [];
-    if (result.place) details.push(el("span", "place", `${result.place} място`));
-    if (result.grade) details.push(el("span", null, `${result.grade} клас`));
+    const details = el("div", "row-sub row-details");
+    if (result.grade) details.append(el("span", null, `${result.grade} клас`));
     if (typeof result.sourceUrl === "string" && result.sourceUrl.startsWith("https://")) {
-        const link = el("a", "source", "Протокол (МОН)");
+        const link = el("a", "source", "Протокол на МОН");
         link.href = result.sourceUrl;
         link.target = "_blank";
         link.rel = "noopener";
-        details.push(link);
+        link.append(icon(ARROW_OUT, 14));
+        details.append(link);
     }
-
-    if (details.length > 0) {
-        const line = el("div", "row-sub row-details");
-        details.forEach((part, i) => {
-            if (i > 0) line.append(" · ");
-            line.append(part);
-        });
-        text.append(line);
-    }
+    if (details.childNodes.length > 0) text.append(details);
 
     row.append(text);
+    row.append(placeBadge(result.place));
 
     const score = formatScore(result.score);
     row.append(score === null
         ? el("span", "score none", "без точки")
-        : el("span", "score", score));
+        : el("span", "score", `${score} т.`));
 
     if (action) {
         row.append(action);
@@ -83,10 +107,20 @@ function resultRow(result, action) {
 }
 
 function saveButton(resultId) {
-    const button = el("button", "button ghost small", "Запази");
+    const button = el("button", "icon-button save");
     button.type = "button";
+    button.setAttribute("aria-label", "Запази този резултат");
+    button.title = "Запази";
+    button.append(icon(BOOKMARK, 18));
     button.addEventListener("click", () => saveResult(resultId, button));
     return button;
+}
+
+function markSaved(button) {
+    button.classList.add("saved");
+    button.disabled = true;
+    button.setAttribute("aria-label", "Запазено");
+    button.title = "Запазено";
 }
 
 // SMART SEARCH
@@ -159,8 +193,11 @@ function studentCard(student) {
     title.append(el("div", "card-meta", competitionsLabel(student.results.length)));
     head.append(title);
 
-    head.append(el("span", "match",
-        `${Math.round(student.matchScore * 100)}% съвпадение`));
+    // The match share only helps when the name is not an exact match.
+    if (student.matchScore < 0.999) {
+        head.append(el("span", "match",
+            `${Math.round(student.matchScore * 100)}% съвпадение`));
+    }
 
     const rowButtons = student.results.map(r => saveButton(r.id));
 
@@ -368,11 +405,11 @@ async function saveResult(resultId, button) {
     });
 
     if (response.ok) {
-        button.textContent = "Запазено ✓";
+        markSaved(button);
         toast("Добавено в библиотеката.");
         loadLibrary();
     } else if (response.status === 409) {
-        button.textContent = "Запазено ✓";
+        markSaved(button);
         toast("Вече е в библиотеката ти.");
     } else {
         button.disabled = false;
@@ -404,7 +441,7 @@ async function saveAllResults(results, rowButtons, button) {
 
         if (response.ok || response.status === 409) {
             if (response.ok) saved++;
-            rowButtons[i].textContent = "Запазено ✓";
+            markSaved(rowButtons[i]);
         } else {
             failed++;
             rowButtons[i].disabled = false;
